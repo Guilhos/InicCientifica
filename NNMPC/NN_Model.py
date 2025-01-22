@@ -24,6 +24,7 @@ class NN_Model:
             input_tensor[0, :, 1] = torch.tensor(pressaoPlenum[-3:])
             input_tensor[0, :, 2] = self.x[i, :, 2]
             input_tensor[0, :, 3] = self.x[i, :, 3]
+            #HAHAHA NAO SEI
 
             # Previsão com desativação do gradiente
             onnx_inputs = {'input': input_tensor.numpy()}
