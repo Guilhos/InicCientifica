@@ -12,8 +12,8 @@ class Simulation:
         self.P1 = 4.5
         self.P_out = 5
         self.C = 479
-        self.alphas = np.random.uniform(0.35,0.65,3)
-        self.N_RotS = np.random.uniform(27e3, 5e4,3)
+        self.alphas = [0.5,0.5,0.5]
+        self.N_RotS = [45e3,45e3,45e3]
         self.dt = dt
         
         #Interpolação
@@ -54,8 +54,6 @@ class Simulation:
         alpha, N = p[0], p[1]  # Divisão dos parâmetros
 
         # Solução Numérica
-        tm1 = time.time()
-
         rhs = ca.vertcat((self.A1 / self.Lc) * ((lut(ca.vertcat(N, x[0])) * self.P1) - x[1]) * 1e3,
                          (self.C**2) / 2 * (x[0] - alpha * self.kv * np.sqrt(x[1] * 1000 - self.P_out * 1000)))
 
@@ -73,16 +71,13 @@ class Simulation:
             init_m = aux1[-1]
             init_p = aux2[-1]
             self.output.append([aux1[0], aux2[0], self.alphas[j], self.N_RotS[j]])
-
-        tm2 = time.time()
-        self.time = tm2-tm1
         
         self.output = np.array(self.output)
 
 if __name__ == '__main__':
     from Interpolation import Interpolation
 
-    lut = Interpolation('./../tabela_phi.csv')
+    lut = Interpolation('tabela_phi.csv')
     lut.load_data()
     interpolation = lut.interpolate()
 
