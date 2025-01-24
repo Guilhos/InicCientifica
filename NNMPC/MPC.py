@@ -2,82 +2,86 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from libs.simulationn import Simulation
-from libs.Interpolation import Interpolation
 from NN_Model import NN_Model
 
-lut = Interpolation('libs/tabela_phi.csv')
-lut.load_data()
-interpolation = lut.interpolate()
+p = 50 # Horizonte de predição
+m = 3 # Horizonte de controle
+q = 0.1 # Peso Q
+r =  1 # Peso R
+nY = 2
+nU = 2
 
-# Definições do problema
-N = 10  # Horizonte de predição
-dt = 0.1  # Intervalo de tempo
-n_states = 1  # Número de estados
-n_controls = 1  # Número de controles
+# dUs provisórios
+dU = [0.05,2000,-0.02,-1000,0.1,1000]
+
+# Conjunto de Pontos Iniciais
+sim = Simulation()
+y0, u0 = sim.run()
+
+# Modelo do sistema
+NNModel = NN_Model(p,m)
+y = NNModel.run(y0,u0,dU) # Previsão dos p próximos pontos
+
+
+    
+
+'''
+pltz = np.linspace(1,p, p)
+fig, (ax1,ax2) = plt.subplots(2,1)
+ax1.plot(pltz, y[0], color='r')
+ax2.plot(pltz, y[1])
+plt.show()
+'''
 
 # Limites das variáveis
-u_min, u_max = -2, 2  # Limites na variável manipulada
-delta_u_min, delta_u_max = -0.5, 0.5  # Limites nos incrementos de u
-y_min, y_max = -1, 1  # Limites na variável controlada
+u_min, u_max = [0.35,27e3], [0.65,5e4]  # Limites na variável manipulada
+delta_u_min, delta_u_max = [0.01, 500], [0.15, 5000]  # Limites nos incrementos de u
+y_min, y_max = [3.5,5.27], [12.3,10.33] # Limites na variável controlada
+
+# Setpoint provisório
+y_sp = (y_max + y_min)/2 
+
+def iTil(n, x):
+    identidade = np.eye(n)
+    iTil = np.vstack([identidade] * (n*x))
+    return iTil
+
+iTilYsp = iTil(nY,p) * y_sp
+
 
 # Parâmetros
 p = 1.0  # Parâmetro da função F(u, p)
 
-# Modelo do sistema
-def system_dynamics(x, u, p):
-    """
-    Dinâmica do sistema.
-    x: estado atual
-    u: entrada manipulada
-    p: parâmetros
-    """
-    return x + u * p * dt
-
-# Função de custo
-def cost_function(U, x0, y_ref, p):
+def cost_function(y, y_sp, dy, dU, q, r):
     """
     Calcula o custo total ao longo do horizonte de predição.
     """
-    x = x0
-    cost = 0
-    for k in range(N):
-        u = U[k]
-        x = system_dynamics(x, u, p)
-        cost += (x - y_ref) ** 2  # Erro quadrático em relação à referência
+    cost = np.sum((y - y_sp + dy) ** 2) * q + np.sum(dU**2) * r # Erro quadrático em relação à referência
     return cost
 
 # Restrições (controladas, manipuladas e incrementos)
-def constraint(U, x0, p):
+def constraint(u, y, p, m):
     """
     Define todas as restrições do problema.
     """
-    x = x0
     constraints = []
-    for k in range(N):
-        u = U[k]
-        x = system_dynamics(x, u, p)
-        
-        # Restrições nas variáveis controladas
-        constraints.append(y_min - x)  # y >= y_min
-        constraints.append(x - y_max)  # y <= y_max
-        
-        # Restrições nas variáveis manipuladas
-        constraints.append(u_min - u)  # u >= u_min
-        constraints.append(u - u_max)  # u <= u_max
-        
-        # Restrições nos incrementos
-        if k > 0:
-            delta_u = U[k] - U[k - 1]
-            constraints.append(delta_u_min - delta_u)  # Delta u >= delta_u_min
-            constraints.append(delta_u - delta_u_max)  # Delta u <= delta_u_max
+    
+    # Restrições nas variáveis controladas
+    for i in range(p):
+        constraints.append(y_min - y[i])  # y >= y_min
+        constraints.append(y[i] - y_max)  # y <= y_max
+    
+    # Restrições nas variáveis manipuladas
+    for i in range(m):
+        constraints.append(u_min - u[i])  # u >= u_min
+        constraints.append(u[i] - u_max)  # u <= u_max
+    
+    # Restrições nos incrementos
+    if k > 0:
+        delta_u = U[k] - U[k - 1]
+        constraints.append(delta_u_min - delta_u)  # Delta u >= delta_u_min
+        constraints.append(delta_u - delta_u_max)  # Delta u <= delta_u_max
     return np.array(constraints)
-
-# Estado inicial e referência desejada
-x0 = 0  # Estado inicial
-y_ref = 0.5  # Referência da saída
-
-# Chute inicial para U
-U0 = np.zeros(N)
 
 # Função de otimização para passar ao solver
 def optimization_function(U):
