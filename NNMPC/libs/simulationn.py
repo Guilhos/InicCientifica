@@ -66,12 +66,12 @@ class Simulation:
             self.y.append([aux1[0], aux2[0]])
             self.u.append([self.alphas[j], self.N_RotS[j]])
         
-        self.y = np.array(self.y)
-        self.u = np.array(self.u)
+        self.y = np.array(self.y).reshape(-1, 1)
+        self.u = np.array(self.u).reshape(-1, 1)
         
         return (self.y, self.u)
 
 if __name__ == '__main__':
     sim = Simulation()
     y,u = sim.run()
-    print(y, u)
+    print(y.shape, y, u)
