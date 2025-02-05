@@ -45,13 +45,12 @@ class CA_Model:
 
     def _build_model(self):
         x_seq = [ca.MX.sym(f'x_{i}', 4, 1) for i in range(3)]  # Sequência de entrada simbólica
-        2 * (inputs - self.x_min) / (self.x_max - self.x_min) - 1
 
         params = self.params
         
         output = self.dense_layer(
             self.dense_layer(
-                self.lstm_layer(x_seq, params[0][0], params[0][1], params[0][2], params[0][3], np.random.rand(60, 1), np.random.rand(60, 1)),
+                self.lstm_layer(x_seq, params[0][0], params[0][1], params[0][2], params[0][3], np.zeros((60, 1)), np.zeros((60, 1))),
                 params[1][0], params[1][1]
             ),
             params[2][0], params[2][1]
@@ -131,6 +130,13 @@ if __name__ == '__main__':
     x1 = x0[0, :]  # Primeira linha, shape (1, 4)
     x2 = x0[1, :]  # Segunda linha, shape (1, 4)
     x3 = x0[2, :]  # Terceira linha, shape (1, 4)
+    
+    x_min = ca.transpose(ca.DM(np.array([3.4846e+00, 5.2707e+00, 3.4151e-01, 2.5049e+04])))
+    x_max = ca.transpose(ca.DM(np.array([1.2275e+01, 1.0323e+01, 6.5596e-01, 5.2308e+04])))
+        
+    x1 = 2 * (x1 - x_min) / (x_max - x_min) - 1
+    x2 = 2 * (x2 - x_min) / (x_max - x_min) - 1
+    x3 = 2 * (x3 - x_min) / (x_max - x_min) - 1
 
     h0 = ca.DM(np.random.rand(60, 1))  # Estado oculto inicial
     c0 = ca.DM(np.random.rand(60, 1))
@@ -138,6 +144,8 @@ if __name__ == '__main__':
     print(Modelo.f_function)
 
     saida = Modelo.f_function(x1,x2,x3)
+    saida = ca.transpose(saida)
+    output = ((saida + 1) / 2) * (x_max[:2] - x_min[:2]) + x_min[:2]
 
     print("Saída da rede CasADi:", saida)
     print('AAAA')
