@@ -31,7 +31,7 @@ class NN_Model:
             dUk = dU[2*k:2*(k+1)]
             
             # Adicionar previsões diretamente
-            if k < m:
+            if k < self.m:
                 alpha.append(alpha[-1] + dUk[0].item())
                 N_Rot.append(N_Rot[-1] + dUk[1].item())
             vazaoMassica.append(onnx_outputs[0][0, 0, 0])
@@ -44,32 +44,30 @@ class NN_Model:
 
         return y,u
 
-
-
-
 if __name__ == '__main__':
     from libs.simulationn import Simulation
 
     p = 50
     m = 3
-
+    dU = [[0],[0],[0],[0],[0],[0]]
     sim = Simulation()
-    y0, u0 = sim.run()
-    nU = len(u0) / m
-    dU = [[0.05],[2000],[-0.02],[-1000],[0.1],[1500]]
-    dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
+    y0, u0, yPlanta = sim.run(p,m,dU)
     print(y0.shape, u0.shape)
 
-    
+    dU = [[0.05],[2000],[-0.02],[-1000],[0.1],[1500]]
+    nU = len(dU)//3
+    dU = np.concatenate((np.array(dU), np.zeros((nU * (p-m), 1))))
 
+    # Y do Modelo
     NNModel = NN_Model(p,m)
     y,u = NNModel.run(y0,u0,dU)
     print(y.shape,u.shape)
 
-    '''
-    pltz = np.linspace(1,p, p)
-    fig, (ax1,ax2) = plt.subplots(2,1)
-    ax1.plot(pltz, y[0], color='r')
-    ax2.plot(pltz, y[1])
-    plt.show()
-    '''
+    # Y da Planta
+    sim = Simulation()
+    y0, u0, yPlanta = sim.run(p,m,dU)
+    print(yPlanta.shape)
+    
+    print(y - yPlanta)
+
+

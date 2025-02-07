@@ -1,123 +1,119 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize
+import casadi as ca
 from libs.simulationn import Simulation
 from NN_Model import NN_Model
 
-'''
-Ordem geral:
+class PINN_MPC():
+    def __init__(self, p, m, q, r, timesteps):
+        #Constantes
+        self.p = p
+        self.m = m
+        self.q = q
+        self.r = r
+        self.timesteps = timesteps
+        self.nU = 2
+        self.nY = 2
 
-Nas variáveis controladas y, se segue [Vazão Volumétrica, Pressão do Plenum]
-Nas variáveis manipuladas u, se segue [Abertura da válvula, Velocidade de rotação do compressor]
+        # dU inicial
+        self.dU = np.zeros((self.nU * self.m, 1))
+        self.dU = np.concatenate((np.array(self.dU), np.zeros((self.nU * (p-m), 1))))
 
-TODO: #1 Fazer dY funcional
+        # Objetos
+        self.sim = Simulation()
+        self.NNMod = NN_Model(p,m)
 
-'''
+        # Limites das variáveis
+        self.u_min = np.array([[0.35], [27e3]])
+        self.u_max = np.array([[0.65], [5e4]])
+        self.dU_min = np.array([[0.01], [500]])
+        self.dU_max = np.array([[0.15], [5000]])
+        self.y_min = np.array([[3.5], [5.27]])
+        self.y_max = np.array([[12.3], [10.33]])
 
-p = 50 # Horizonte de predição
-m = 3 # Horizonte de controle
-timesteps = 3
-q = 0.1 # Peso Q
-r =  1 # Peso R
-
-# Conjunto de Pontos Iniciais
-sim = Simulation()
-y0, u0 = sim.run()
-nU = len(u0) / timesteps
-nY = len(y0) / timesteps
-
-# dUs provisórios
-dU = [[0.05],[2000],[-0.02],[-1000],[0.1],[1000]]
-dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1)))) # Adição de P - M linhas de 0. SHAPE -> (nY*P, 1)
-
-# Modelo do sistema
-NNModel = NN_Model(p,m)
-y = NNModel.run(y0,u0,dU) # Previsão dos p próximos pontos
-
-# Limites das variáveis
-u_min, u_max = [[0.35],[27e3]], [[0.65],[5e4]]  # Limites na variável manipulada. SHAPE -> (nU, 1)
-dU_min, dU_max = [[0.01], [500]], [[0.15], [5000]]  # Limites nos incrementos de u. SHAPE -> (nU, 1)
-y_min, y_max = [[3.5],[5.27]], [[12.3],[10.33]] # Limites na variável controlada. SHAPE -> (nY, 1)
-
-# Setpoint provisório
-y_sp = (y_max + y_min)/2  # A média entre os valores mínimos e máximos. SHAPE -> (nY, 1)
-
-'''Ajuste dos tamanhos das Matrizes de valores constantes'''
-
-def iTil(n, x):
-    n = np.tile(n, (x,1))
-    return n
-
-y_sp = iTil(y_sp,p) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1)
-y_min = iTil(y_min,p) # Expansão do y_min para P. SHAPE -> (nY*P, 1)
-y_max = iTil(y_max,p) # Expansão do y_max para P. SHAPE -> (nY*P, 1)
-
-u_min = iTil(u_min,m) # Expansão do u_min para M. SHAPE -> (nU*M, 1)
-u_max = iTil(u_max,m) # Expansão do u_max para M. SHAPE -> (nU*M, 1)
-
-dU_min = iTil(dU_min, m) # Expansão do dU_min para M. SHAPE -> (nU*M, 1)
-dU_min = np.concatenate((dU_min,np.zeros((int(nU) * (p - m), 1)))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
-dU_max = iTil(dU_max, m) # Expansão do dU_max para M. SHAPE -> (nU*M, 1)
-dU_max = np.concatenate((dU_max,np.zeros((int(nU) * (p - m), 1)))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
-
-def diagMatrix(x,n):
-    x = np.float64(x)
-    X_matrix = np.full((n,n),0, dtype=np.float64)
-    np.fill_diagonal(X_matrix,x)
-    return X_matrix
-
-q = diagMatrix(q,nY*p) # Criação de uma matriz com os valores de Q na diagonal. SHAPE -> (nY*p, nY*p)
-r = diagMatrix(r,nU*p) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
-
-def cost_function(y, y_sp, dy, dU, q, r):
-    cost = (y - y_sp + dy).T @ q @ (y - y_sp + dy) + dU.T @ r @ dU # Erro quadrático em relação à referência
-    return cost
-
-# Restrições (controladas, manipuladas e incrementos)
-def constraint(u, y, p, m):
-    """
-    Define todas as restrições do problema.
-    """
-    constraints = []
+        # Setpoint provisório
+        self.y_sp = (self.y_max + self.y_min) / 2
     
-    # Restrições nas variáveis controladas
-    constraints.append(y_min - y)  # y >= y_min
-    constraints.append(y - y_max)  # y <= y_max
+    # Pontos, Pontos Iniciais, Planta, Modelo
+
+    def pPlanta(self, dU):
+        y0, u0, yPlanta = self.sim.run(self.p, self.m, dU)
+        return y0, u0, yPlanta
     
-    # Restrições nas variáveis manipuladas
-    constraints.append(u_min - u)  # u >= u_min
-    constraints.append(u - u_max)  # u <= u_max
+    def pModelo(self, y0, u0, dU):
+        yModel, uModel = self.NNMod.run(y0,u0,dU)
+        return yModel, uModel
     
-    # Restrições nos incrementos
-    constraints.append(dU_min - dU)  # Delta u >= delta_u_min
-    constraints.append(dU - dU_max)  # Delta u <= delta_u_max
+    # Ajuste das Matrizes
 
-    # Restrição de f
-    constraints.append(f - (y - y_sp + dy).T @ q @ (y - y_sp + dy) + dU.T @ r @ dU) # f = (y - y_sp + dy).T @ q @ (y - y_sp + dy) + dU.T @ r @ dU)
+    def iTil(self, n, x):
+        n = np.tile(n, (x,1))
+        return n
+    
+    def diagMatrix(self, x,n):
+        x = np.float64(x)
+        n = int(n)
+        X_matrix = np.full((n,n),0, dtype=np.float64)
+        np.fill_diagonal(X_matrix,x)
+        return X_matrix
 
-    return np.array(constraints)
+    def ajusteMatrizes(self):
+        self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1)
+        self.y_min = ca.DM(self.iTil(self.y_min,self.p)) # Expansão do y_min para P. SHAPE -> (nY*P, 1)
+        self.y_max = ca.DM(self.iTil(self.y_max,self.p)) # Expansão do y_max para P. SHAPE -> (nY*P, 1)
 
-# Função de otimização para passar ao solver
-def optimization_function(U):
-    return f
+        self.u_min = ca.DM(self.iTil(self.u_min,self.p)) # Expansão do u_min para M. SHAPE -> (nU*M, 1)
+        self.u_max = ca.DM(self.iTil(self.u_max,self.p)) # Expansão do u_max para M. SHAPE -> (nU*M, 1)
 
-# Restrições
-cons = {
-    "type": "ineq",
-    "fun": lambda U: constraint(U, y0, p),
-}
+        self.dU_min = self.iTil(self.dU_min, self.m) # Expansão do dU_min para M. SHAPE -> (nU*M, 1)
+        self.dU_min = ca.DM(np.concatenate((self.dU_min,np.zeros((int(self.nU) * (self.p - self.m), 1))))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
+        self.dU_max = self.iTil(self.dU_max, self.m) # Expansão do dU_max para M. SHAPE -> (nU*M, 1)
+        self.dU_max = ca.DM(np.concatenate((self.dU_max,np.zeros((int(self.nU) * (self.p - self.m), 1))))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
 
-# Resolver o problema de otimização
-solution = minimize(
-    optimization_function,
-    u0,
-    constraints=cons,
-    bounds=[(dU_min, dU_max)] * p,  # Limites em U
-    method="SLSQP",
-    options={"disp": True},
-)
+        self.q = ca.DM(self.diagMatrix(self.q,self.nY*self.p)) # Criação de uma matriz com os valores de Q na diagonal. SHAPE -> (nY*p, nY*p)
+        self.r = ca.DM(self.diagMatrix(self.r,self.nU*self.p)) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
 
-# Resultados
-optimal_u = solution.x
-print("Valores ótimos de u ao longo do horizonte:")
-print(optimal_u)
+    # Otimização
+
+    def otimizar(self, yModel, uModel, yPlanta):
+        yModel = ca.DM(yModel)
+        yPlanta = ca.DM(yPlanta)
+        dY = yModel - yPlanta
+        
+        Fs = ca.MX.sym('f')
+        dUs = ca.MX.sym('dU',self.nU * self.p, 1)
+
+        x = ca.vertcat(dUs, Fs)
+
+        g = ca.vertcat(yModel, uModel)
+
+        dU_init = ca.DM(self.dU)
+        x0 = [dU_init, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init]
+
+        x_min = [self.dU_min, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_min.T @ self.r @ self.dU_min]
+        x_max = [self.dU_max, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_max.T @ self.r @ self.dU_max]
+
+        # Garantindo que lbg e ubg estejam no formato correto
+        lbg = [self.y_min, self.u_min - dU_init]  # Transformar em array antes do DM
+        ubg = [self.y_max, self.u_max - dU_init]
+
+        nlp = {'x': x, 'f': Fs, 'g': g}
+        solver = ca.nlpsol('solver', 'ipopt', nlp)
+
+        sol = solver(x0=x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
+        # Extraindo os resultados
+        dU_opt, f = sol['x'].full().flatten()
+        return dU_opt
+    
+    def run(self):
+        self.ajusteMatrizes()
+        y0, u0, yPlanta = self.pPlanta(self.dU)
+        yModel, uModel = self.pModelo(y0, u0, self.dU)
+        dU_opt = self.otimizar(yModel, uModel, yPlanta)
+        return dU_opt
+
+if __name__ == '__main__':
+    p, m, q, r, timesteps = 50, 3, 0.1, 1, 3
+    mpc = PINN_MPC(p, m, q, r, timesteps)
+    dU_opt = mpc.run()
+    print("Controle ótimo:", dU_opt)
