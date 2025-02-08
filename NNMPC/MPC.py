@@ -107,13 +107,14 @@ class PINN_MPC():
     
     def run(self):
         self.ajusteMatrizes()
-        y0, u0, yPlanta = self.pPlanta(self.dU)
-        yModel, uModel = self.pModelo(y0, u0, self.dU)
-        dU_opt = self.otimizar(yModel, uModel, yPlanta)
-        dU_opt = dU_opt[:-1].reshape((100,1))
-        self.dU = dU_opt
+        for i in range(2):
+            y0, u0, yPlanta = self.pPlanta(self.dU)
+            yModel, uModel = self.pModelo(y0, u0, self.dU)
+            dU_opt = self.otimizar(yModel, uModel, yPlanta)
+            dU_opt = dU_opt[:-1].reshape((100,1))
+            self.dU = dU_opt
 
-        print(yModel,uModel)
+            print(yModel,uModel)
         return dU_opt
 
 if __name__ == '__main__':
