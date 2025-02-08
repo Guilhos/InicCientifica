@@ -88,21 +88,21 @@ class PINN_MPC():
         g = ca.vertcat(yModel, uModel)
 
         dU_init = ca.DM(self.dU)
-        x0 = [dU_init, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init]
+        x0 = ca.vertcat(dU_init, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
 
-        x_min = [self.dU_min, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_min.T @ self.r @ self.dU_min]
-        x_max = [self.dU_max, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_max.T @ self.r @ self.dU_max]
+        x_min = ca.vertcat(self.dU_min, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_min.T @ self.r @ self.dU_min)
+        x_max = ca.vertcat(self.dU_max, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_max.T @ self.r @ self.dU_max)
 
         # Garantindo que lbg e ubg estejam no formato correto
-        lbg = [self.y_min, self.u_min - dU_init]  # Transformar em array antes do DM
-        ubg = [self.y_max, self.u_max - dU_init]
+        lbg = ca.vertcat(self.y_min, self.u_min - dU_init)  # Transformar em array antes do DM
+        ubg = ca.vertcat(self.y_max, self.u_max - dU_init)
 
         nlp = {'x': x, 'f': Fs, 'g': g}
         solver = ca.nlpsol('solver', 'ipopt', nlp)
 
         sol = solver(x0=x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
         # Extraindo os resultados
-        dU_opt, f = sol['x'].full().flatten()
+        dU_opt = sol['x'].full().flatten()
         return dU_opt
     
     def run(self):
@@ -110,10 +110,14 @@ class PINN_MPC():
         y0, u0, yPlanta = self.pPlanta(self.dU)
         yModel, uModel = self.pModelo(y0, u0, self.dU)
         dU_opt = self.otimizar(yModel, uModel, yPlanta)
+        dU_opt = dU_opt[:-1].reshape((100,1))
+        self.dU = dU_opt
+
+        print(yModel,uModel)
         return dU_opt
 
 if __name__ == '__main__':
     p, m, q, r, timesteps = 50, 3, 0.1, 1, 3
     mpc = PINN_MPC(p, m, q, r, timesteps)
     dU_opt = mpc.run()
-    print("Controle ótimo:", dU_opt)
+    print("Controle ótimo:", dU_opt, dU_opt.shape)

@@ -13,9 +13,6 @@ class Simulation:
         self.alphas = [0.5,0.55,0.45]
         self.N_RotS = [385e2,39e3,38e3]
         self.dt = dt
-        
-        self.y = []
-        self.u = []
 
         try:
             # Tentando importar de libs.Interpolation
@@ -39,6 +36,8 @@ class Simulation:
         return [eqn_1, eqn_2]
 
     def run(self, prev, m, dU):
+        self.y = []
+        self.u = []
 
         for k in range(m):
             self.alphas[k] += dU[2*k][0]

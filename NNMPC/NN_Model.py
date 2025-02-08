@@ -31,9 +31,8 @@ class NN_Model:
             dUk = dU[2*k:2*(k+1)]
             
             # Adicionar previsões diretamente
-            if k < self.m:
-                alpha.append(alpha[-1] + dUk[0].item())
-                N_Rot.append(N_Rot[-1] + dUk[1].item())
+            alpha.append(alpha[-1] + dUk[0].item())
+            N_Rot.append(N_Rot[-1] + dUk[1].item())
             vazaoMassica.append(onnx_outputs[0][0, 0, 0])
             pressaoPlenum.append(onnx_outputs[0][0, 0, 1])
 
