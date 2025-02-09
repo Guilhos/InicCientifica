@@ -20,7 +20,7 @@ class PINN_MPC():
         self.dU = np.concatenate((np.array(self.dU), np.zeros((self.nU * (p-m), 1))))
 
         # Objetos
-        self.sim = Simulation()
+        self.sim = Simulation(p,m)
         self.NNMod = NN_Model(p,m)
 
         # Limites das variáveis
@@ -32,17 +32,7 @@ class PINN_MPC():
         self.y_max = np.array([[12.3], [10.33]])
 
         # Setpoint provisório
-        self.y_sp = (self.y_max + self.y_min) / 2
-    
-    # Pontos, Pontos Iniciais, Planta, Modelo
-
-    def pPlanta(self, dU):
-        y0, u0, yPlanta = self.sim.run(self.p, self.m, dU)
-        return y0, u0, yPlanta
-    
-    def pModelo(self, y0, u0, dU):
-        yModel, uModel = self.NNMod.run(y0,u0,dU)
-        return yModel, uModel
+        self.y_sp = np.array([[10], [8]])
     
     # Ajuste das Matrizes
 
@@ -90,15 +80,15 @@ class PINN_MPC():
         dU_init = ca.DM(self.dU)
         x0 = ca.vertcat(dU_init, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
 
-        x_min = ca.vertcat(self.dU_min, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_min.T @ self.r @ self.dU_min)
-        x_max = ca.vertcat(self.dU_max, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + self.dU_max.T @ self.r @ self.dU_max)
+        x_min = ca.vertcat(self.dU_min, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
+        x_max = ca.vertcat(self.dU_max, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
 
-        # Garantindo que lbg e ubg estejam no formato correto
-        lbg = ca.vertcat(self.y_min, self.u_min - dU_init)  # Transformar em array antes do DM
-        ubg = ca.vertcat(self.y_max, self.u_max - dU_init)
+        lbg = ca.vertcat(self.y_min, self.u_min) 
+        ubg = ca.vertcat(self.y_max, self.u_max)
 
         nlp = {'x': x, 'f': Fs, 'g': g}
-        solver = ca.nlpsol('solver', 'ipopt', nlp)
+        options = {'print_time': False}
+        solver = ca.nlpsol('solver', 'ipopt', nlp, options)
 
         sol = solver(x0=x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
         # Extraindo os resultados
@@ -107,14 +97,51 @@ class PINN_MPC():
     
     def run(self):
         self.ajusteMatrizes()
-        for i in range(2):
-            y0, u0, yPlanta = self.pPlanta(self.dU)
-            yModel, uModel = self.pModelo(y0, u0, self.dU)
+        y0, u0 = self.sim.pIniciais()
+        y0p = y0
+        resM = []
+        resP = []
+        iter = 3
+        for i in range(iter):
+            print(y0,u0)
+            yPlanta = self.sim.pPlanta(y0p, self.dU)
+            yModel, uModel = self.NNMod.run(y0,u0,self.dU)
+            resM.append(yModel[::2])
+            resP.append(yModel[1::2])
+
             dU_opt = self.otimizar(yModel, uModel, yPlanta)
             dU_opt = dU_opt[:-1].reshape((100,1))
             self.dU = dU_opt
+            y0 = yModel[-self.timesteps*self.nY:]
+            u0 = uModel[-self.timesteps*self.nU:]
+            y0p = yPlanta[-self.timesteps*self.nY:]
 
-            print(yModel,uModel)
+            print(dU_opt[:6])
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+
+        x = np.linspace(0,iter*self.p,iter*self.p)
+        y_spM = np.full_like(x, self.y_sp[0])
+        y_spP = np.full_like(x, self.y_sp[1])
+        axes[0].plot(x, np.array(resM).reshape(iter * p, 1), label="resM")
+        axes[0].plot(x, y_spM, linestyle="--", color="red", label="y_sp")
+        axes[0].set_title("resM")
+        axes[0].set_ylabel("Valor")
+        axes[0].legend()
+        axes[0].grid()
+
+        axes[1].plot(x, np.array(resP).reshape(iter * p, 1), label="resP", color="green")
+        axes[1].plot(x, y_spP, linestyle="--", color="red", label="y_sp")
+        axes[1].set_title("resP")
+        axes[1].legend()
+        axes[1].grid()
+
+        plt.xlabel("Tempo")
+        plt.suptitle("Comparação de resM e resP")
+        plt.tight_layout()
+
+        plt.show()
+
         return dU_opt
 
 if __name__ == '__main__':
