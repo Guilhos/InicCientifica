@@ -20,8 +20,10 @@ class PINN_MPC():
         self.dU = np.concatenate((np.array(self.dU), np.zeros((self.nU * (p-m), 1))))
 
         # Objetos
-        self.sim = Simulation(p,m)
-        self.NNMod = NN_Model(p,m)
+        self.sim_pred = Simulation(p,m)
+        self.sim_mf = Simulation(1,1)
+        self.NNMod_pred = NN_Model(p,m)
+        self.NNMod_mf = NN_Model(1,1)
 
         # Limites das variáveis
         self.u_min = np.array([[0.35], [27e3]])
@@ -65,23 +67,25 @@ class PINN_MPC():
 
     # Otimização
 
-    def otimizar(self, yModel, uModel, yPlanta):
-        yModel = ca.DM(yModel)
-        yPlanta = ca.DM(yPlanta)
-        dY = yModel - yPlanta
+    def otimizar(self, yModelk, uModelk, yPlantak):
+        yModelk = ca.DM(yModelk)
+        yPlantak = ca.DM(yPlantak)
+        dYk = yPlantak - yModelk[-self.nY:0]
         
         Fs = ca.MX.sym('f')
         dUs = ca.MX.sym('dU',self.nU * self.p, 1)
 
         x = ca.vertcat(dUs, Fs)
 
-        g = ca.vertcat(yModel, uModel)
+        g = ca.vertcat(yModelk, uModelk)
+
+        yModel_pred = self.NNMod_pred.run(yModelk,uModelk,dUs)
 
         dU_init = ca.DM(self.dU)
-        x0 = ca.vertcat(dU_init, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
+        x0 = ca.vertcat(dU_init, (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
 
-        x_min = ca.vertcat(self.dU_min, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
-        x_max = ca.vertcat(self.dU_max, (yModel - self.y_sp + dY).T @ self.q @ (yModel - self.y_sp + dY) + dU_init.T @ self.r @ dU_init)
+        x_min = ca.vertcat(self.dU_min, (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
+        x_max = ca.vertcat(self.dU_max, (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
 
         lbg = ca.vertcat(self.y_min, self.u_min) 
         ubg = ca.vertcat(self.y_max, self.u_max)
@@ -97,24 +101,27 @@ class PINN_MPC():
     
     def run(self):
         self.ajusteMatrizes()
-        y0, u0 = self.sim.pIniciais()
-        y0p = y0
-        resM = []
-        resP = []
-        iter = 3
-        for i in range(iter):
-            print(y0,u0)
-            yPlanta = self.sim.pPlanta(y0p, self.dU)
-            yModel, uModel = self.NNMod.run(y0,u0,self.dU)
-            resM.append(yModel[::2])
-            resP.append(yModel[1::2])
+        ymk, umk = self.sim_pred.pIniciais()
+        ypk, uk = ymk[-self.nY:0], umk[-self.nU:0]
+        
+        Ypk = []
+        Uk = []
+        Ymk = []
+        Yspk = []
+        Ymink = []
+        Ymaxk = []
 
-            dU_opt = self.otimizar(yModel, uModel, yPlanta)
-            dU_opt = dU_opt[:-1].reshape((100,1))
-            self.dU = dU_opt
-            y0 = yModel[-self.timesteps*self.nY:]
-            u0 = uModel[-self.timesteps*self.nU:]
-            y0p = yPlanta[-self.timesteps*self.nY:]
+        iter = 500
+        for i in range(iter):
+            
+            dU_opt = self.otimizar(ymk[-self.timesteps*self.nY:0], umk[-self.timesteps*self.nU:0], ypk)
+            
+            ypk = self.sim_mf.pPlanta(ypk, dU_opt[0:self.nU])
+            ymk_next, umk_next = self.NNMod_mf.run(ymk,umk,dU_opt[0:self.nU])
+            ymk.append(ymk_next)
+            umk.append(umk_next)
+
+            Ypk.append(ypk)
 
             print(dU_opt[:6])
 

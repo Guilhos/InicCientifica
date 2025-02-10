@@ -65,14 +65,23 @@ if __name__ == '__main__':
     p = 50
     m = 3
 
-    sim = Simulation()
-    y0, u0 = sim.run()
+    sim = Simulation(p,m)
+    y0, u0 = sim.pIniciais()
     nU = len(u0) / m
-    dU = [[0.05],[2000],[-0.02],[-1000],[0.1],[1500]]
+    dU = [[0],[0],[0],[0],[0],[0]]
     dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
-    print(y0.shape, u0.shape)
-    x0 = ca.horzcat(y0,u0)
-    print(x0.shape)
+    yPlanta = sim.pPlanta(y0,dU)
+    print(y0, u0)
+    x0 = []
+
+    # Iterar pelos dois arrays e intercalar 2 elementos de cada vez
+    for i in range(0, len(y0), 2):
+        x0.append(y0[i:i+2])  # Adiciona 2 elementos de y
+        x0.append(u0[i:i+2])  # Adiciona 2 elementos de u
+
+    # Transformar o x0ado em um array numpy
+    x0 = np.vstack(x0)
+    print(x0)
 
     # Carregar os pesos do modelo salvos
     model_path = "NNMPC/libs/modelo_treinado.pth"
@@ -127,16 +136,19 @@ if __name__ == '__main__':
     Modelo = CA_Model(params)
     
     # Extrai cada linha de x0
-    x1 = x0[0, :]  # Primeira linha, shape (1, 4)
-    x2 = x0[1, :]  # Segunda linha, shape (1, 4)
-    x3 = x0[2, :]  # Terceira linha, shape (1, 4)
+    x1 = x0[:4]  # Primeira linha, shape (1, 4)
+    x2 = x0[4:8]  # Segunda linha, shape (1, 4)
+    x3 = x0[8:12]  # Terceira linha, shape (1, 4)
     
-    x_min = ca.transpose(ca.DM(np.array([3.4846e+00, 5.2707e+00, 3.4151e-01, 2.5049e+04])))
-    x_max = ca.transpose(ca.DM(np.array([1.2275e+01, 1.0323e+01, 6.5596e-01, 5.2308e+04])))
-        
+    x_min = np.array([[3.4846e+00], [5.2707e+00], [3.4151e-01], [2.5049e+04]])
+    x_max = np.array([[1.2275e+01], [1.0323e+01], [6.5596e-01], [5.2308e+04]])
+    
+    
+    print(x1,x2,x3)
     x1 = 2 * (x1 - x_min) / (x_max - x_min) - 1
     x2 = 2 * (x2 - x_min) / (x_max - x_min) - 1
     x3 = 2 * (x3 - x_min) / (x_max - x_min) - 1
+    print(x1,x2,x3)
 
     h0 = ca.DM(np.random.rand(60, 1))  # Estado oculto inicial
     c0 = ca.DM(np.random.rand(60, 1))
@@ -144,8 +156,10 @@ if __name__ == '__main__':
     print(Modelo.f_function)
 
     saida = Modelo.f_function(x1,x2,x3)
-    saida = ca.transpose(saida)
+        
     output = ((saida + 1) / 2) * (x_max[:2] - x_min[:2]) + x_min[:2]
 
-    print("Saída da rede CasADi:", saida)
+    print("Saída da rede CasADi:", output)
+    print(y0)
+    print(yPlanta)
     print('AAAA')
