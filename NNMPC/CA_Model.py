@@ -121,12 +121,13 @@ if __name__ == '__main__':
     p = 50
     m = 3
 
-    sim = Simulation(p,m)
+    sim = Simulation(3,3)
+    sim_mf = Simulation(1,1)
     y0, u0 = sim.pIniciais()
     nU = len(u0) / m
     dU = [[0],[0],[0],[0],[0],[0]]
     dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
-    yPlanta = sim.pPlanta(y0,dU)
+    yPlanta = sim_mf.pPlanta(y0,dU)
     print(y0, u0)
     x0 = []
 
@@ -145,9 +146,13 @@ if __name__ == '__main__':
     # Extrai cada linha de x0
     print(Modelo.f_function)
 
-    saida = Modelo.f_function(ca.DM(x0[:4]),ca.DM(x0[4:8]),ca.DM(x0[8:]))
+    for i in range(1):
+        saida = Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:]))
+        x0 = np.append(x0,saida)
+        x0 = np.append(x0,x0[-4:-2])
 
+    print(x0.shape)
     print("Saída da rede CasADi:", saida)
-    print(y0)
     print(yPlanta)
+    print(yPlanta - saida)
     print('AAAA')
