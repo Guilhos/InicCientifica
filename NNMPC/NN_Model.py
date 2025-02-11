@@ -49,24 +49,18 @@ if __name__ == '__main__':
     p = 50
     m = 3
     dU = [[0],[0],[0],[0],[0],[0]]
-    sim = Simulation()
-    y0, u0, yPlanta = sim.run(p,m,dU)
+    sim = Simulation(3,3)
+    y0, u0 = sim.pIniciais()
     print(y0.shape, u0.shape)
 
-    dU = [[0.05],[2000],[-0.02],[-1000],[0.1],[1500]]
     nU = len(dU)//3
     dU = np.concatenate((np.array(dU), np.zeros((nU * (p-m), 1))))
 
     # Y do Modelo
-    NNModel = NN_Model(p,m)
+    NNModel = NN_Model(1,1)
     y,u = NNModel.run(y0,u0,dU)
-    print(y.shape,u.shape)
+    print(y)
 
-    # Y da Planta
-    sim = Simulation()
-    y0, u0, yPlanta = sim.run(p,m,dU)
-    print(yPlanta.shape)
     
-    print(y - yPlanta)
 
 

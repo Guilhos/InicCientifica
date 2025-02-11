@@ -70,17 +70,21 @@ class PINN_MPC():
 
     def otimizar(self, yModelk, uModelk, yPlantak):
         Fs = ca.MX.sym('f')
-        dUs = ca.MX.sym('dU',self.nU * self.p, 1)
+        dUs = ca.MX.sym('dU',self.nU*self.p, 1)
 
         x = ca.vertcat(dUs, Fs)
 
         g = ca.vertcat(yModelk, uModelk)
 
+        xModelk = []
         yModel_pred = []
 
-        xm_2 = ca.vertcat(yModelk[-6:-4],uModelk[-6:-4])
-        xm_1 = ca.vertcat(yModelk[-4:-2],uModelk[-4:-2])
-        xmk = ca.vertcat(yModelk[-2:],uModelk[-2:])
+        for i in range(0, len(yModelk), 2):
+            xModelk.append(yModelk[i:i+2])  # Adiciona 2 elementos de y
+            xModelk.append(uModelk[i:i+2])  # Adiciona 2 elementos de u
+
+        # Transformar o x0ado em um array numpy
+        xModelk = ca.DM(np.vstack(xModelk))
 
         yModelk = ca.DM(yModelk)
         yPlantak = ca.DM(yPlantak)
@@ -88,8 +92,12 @@ class PINN_MPC():
         dYk = ca.DM(self.iTil(dYk,self.p).reshape(-1,1))
         
         for i in range(self.p):
-            saida = self.CAMod.f_function(xm_2, xm_1, xmk)
-            yModel_pred = np.append(yModel_pred,saida)
+            xModelk = ca.vertcat(xModelk[:-2], xModelk[-2:] + dUs)
+
+            saida = self.CAMod.f_function(xModelk[-3*(self.nY+self.nU):-2*(self.nY+self.nU)], xModelk[-2*(self.nY+self.nU):-(self.nY+self.nU)], xModelk[-(self.nY+self.nU):])
+            xModelk = ca.vertcat(xModelk, saida)
+            yModel_pred = ca.vertcat(yModel_pred,saida)
+            xModelk = ca.vertcat(xModelk,xModelk[-4:-2])
 
         dU_init = ca.DM(self.dU)
         x0 = ca.vertcat(dU_init, (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
@@ -106,7 +114,7 @@ class PINN_MPC():
 
         sol = solver(x0=x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
         # Extraindo os resultados
-        dU_opt = sol['x'].full().flatten()
+        dU_opt = sol['x'][:self.nU].full().flatten()
         return dU_opt
     
     def run(self):
@@ -126,13 +134,15 @@ class PINN_MPC():
         for i in range(iter):
             
             dU_opt = self.otimizar(ymk[-self.timesteps*self.nU*self.nY:],umk[-self.timesteps*self.nU*self.nY:], ypk)
-            umk.append(dU_opt[:self.nU])
+            umk = np.append(umk, dU_opt[:self.nU])
+            umk = umk[2:]
             xm_2 = ca.vertcat(ymk[-6:-4],umk[-6:-4])
             xm_1 = ca.vertcat(ymk[-4:-2],umk[-4:-2])
             xmk = ca.vertcat(ymk[-2:],umk[-2:])
             ypk = self.sim_mf.pPlanta(ypk, dU_opt[:self.nU])
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
-            ymk.append(ymk_next)
+            ymk = np.append(ymk, ymk_next)
+            ymk = ymk[2:]
 
             Ypk.append(ypk)
 

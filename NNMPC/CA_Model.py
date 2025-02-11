@@ -114,6 +114,33 @@ class CA_Model:
         
         return ca.Function('CA_Model', x_seq, [output])
 
+    def build_model_mpc(self,p,m,ny,nu,steps):
+        
+        pred_fun = self._build_model()
+
+        y_k = [ca.MX.sym(f'y_{i}', ny, 1) for i in range(steps)]  # Sequência de entrada simbólica
+
+        u_k = [ca.MX.sym(f'u_{i}', nu, 1) for i in range(steps)]  # Sequência de entrada simbólica
+
+        du_k = [ca.MX.sym(f'du_{i}', nu, 1) for i in range(m)]  # Sequência de entrada simbólica
+
+        for i in range(m):
+            u_k.append(u_k[-1]+du_k[i])
+        
+
+        for i in range(p):
+            y = y_k[i:i]
+
+
+            y_k.append()
+
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     from libs.simulationn import Simulation
@@ -128,7 +155,7 @@ if __name__ == '__main__':
     dU = [[0],[0],[0],[0],[0],[0]]
     dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
     yPlanta = sim_mf.pPlanta(y0,dU)
-    print(y0, u0)
+    #print(y0, u0)
     x0 = []
 
     # Iterar pelos dois arrays e intercalar 2 elementos de cada vez
@@ -138,13 +165,13 @@ if __name__ == '__main__':
 
     # Transformar o x0ado em um array numpy
     x0 = np.vstack(x0)
-    print(x0)
+    #print(x0)
 
     # Criar a instância da rede CasADi
     Modelo = CA_Model("NNMPC/libs/modelo_treinado.pth")
     
     # Extrai cada linha de x0
-    print(Modelo.f_function)
+    #print(Modelo.f_function)
 
     for i in range(1):
         saida = Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:]))
@@ -154,5 +181,5 @@ if __name__ == '__main__':
     print(x0.shape)
     print("Saída da rede CasADi:", saida)
     print(yPlanta)
-    print(yPlanta - saida)
-    print('AAAA')
+    #print(yPlanta - saida)
+    #print('AAAA')

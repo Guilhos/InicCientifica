@@ -77,8 +77,8 @@ class Simulation:
     def pPlanta(self, y0, dU):
         self.y = []
         for k in range(self.m):
-            self.alphas[k] += dU[2*k][0]
-            self.N_RotS[k] += dU[2*k+1][0]
+            self.alphas[-1] += dU[0].item()
+            self.N_RotS[-1] += dU[0].item()
         init_m = y0[-2].item()
         init_p = y0[-1].item()
 
