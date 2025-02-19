@@ -83,7 +83,6 @@ class PINN_MPC():
             xModelk.append(yModelk[i:i+2])  # Adiciona 2 elementos de y
             xModelk.append(uModelk[i:i+2])  # Adiciona 2 elementos de u
 
-        # Transformar o x0ado em um array numpy
         xModelk = ca.DM(np.vstack(xModelk))
 
         yModelk = ca.DM(yModelk)

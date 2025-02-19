@@ -115,32 +115,39 @@ class CA_Model:
         return ca.Function('CA_Model', x_seq, [output])
 
     def build_model_mpc(self,p,m,ny,nu,steps):
-        
-        pred_fun = self._build_model()
 
-        y_k = [ca.MX.sym(f'y_{i}', ny, 1) for i in range(steps)]  # Sequência de entrada simbólica
+        y_k = ca.MX.sym(f'y_{i}', ny*steps, 1) # Sequência de entrada simbólica
 
-        u_k = [ca.MX.sym(f'u_{i}', nu, 1) for i in range(steps)]  # Sequência de entrada simbólica
+        u_k = ca.MX.sym(f'u_{i}', nu*steps, 1)  # Sequência de entrada simbólica
 
-        du_k = [ca.MX.sym(f'du_{i}', nu, 1) for i in range(m)]  # Sequência de entrada simbólica
+        du_k = ca.MX.sym(f'du_{i}', nu*m, 1) # Sequência de entrada simbólica
 
         for i in range(m):
-            u_k.append(u_k[-1]+du_k[i])
+            u_k[-2*(3-i):-2*(3-i)+1] = u_k[-2*(3-i):-2*(3-i)+1] + du_k[2*i:2*i+1]
         
+        x_seq = [[y_k[-ny*steps],y_k[-ny*steps+1],u_k[-nu*steps],u_k[-nu*steps+1]],
+                 [y_k[-ny*(steps-1)],y_k[-ny*(steps-1)+1],u_k[-nu*(steps-1)],u_k[-nu*(steps-1)+1]],
+                 [y_k[-ny*(steps-2)],y_k[-ny*(steps-2)+1],u_k[-nu*(steps-2)],u_k[-nu*(steps-2)+1]]]
 
-        for i in range(p):
-            y = y_k[i:i]
+        x_seq_norm = [(2 * (x - self.x_min) / (self.x_max - self.x_min) - 1) for x in x_seq]
 
+        params = self.params
+        
+        output = self.dense_layer(
+            self.dense_layer(
+                self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], np.zeros((60, 1)), np.zeros((60, 1))),
+                params[1][0], params[1][1]
+            ),
+            params[2][0], params[2][1]
+        )
 
-            y_k.append()
+        output = ((output + 1) / 2) * (self.x_max[:2] - self.x_min[:2]) + self.x_min[:2]
 
+        y_k.append(output)
 
+        return ca.Function('CA_Model_MPC', [y_k, u_k, du_k], [y_k])
 
-
-
-
-
-
+        
 
 if __name__ == '__main__':
     from libs.simulationn import Simulation

@@ -10,8 +10,8 @@ class Simulation:
         self.P1 = 4.5
         self.P_out = 5
         self.C = 479
-        self.alphas = [0.5,0.55,0.45]
-        self.N_RotS = [385e2,39e3,38e3]
+        self.alphas = [0.5,0.5,0.55]
+        self.N_RotS = [38500,38500,38500]
         self.dt = dt
         self.y = []
         self.u = []
