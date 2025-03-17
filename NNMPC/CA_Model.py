@@ -125,6 +125,9 @@ class CA_Model:
 
         du_k = ca.MX.sym(f'du_k', nu*m, 1) # Sequência de entrada simbólica
 
+        x_min_mx = ca.MX(self.x_min)
+        x_max_mx = ca.MX(self.x_max)
+
         for i in range(m):
                 u_k[-2*(3-i):-2*(3-i)+1] = u_k[-2*(3-i):-2*(3-i)+1] + du_k[2*i:2*i+1]
 
@@ -133,7 +136,7 @@ class CA_Model:
                     ca.vertcat(y_k[-ny*(steps-1)],y_k[-ny*(steps-1)+1],u_k[-nu*(steps-1)],u_k[-nu*(steps-1)+1]),
                     ca.vertcat(y_k[-ny*(steps-2)],y_k[-ny*(steps-2)+1],u_k[-nu*(steps-2)],u_k[-nu*(steps-2)+1])]
             
-            x_seq_norm = [(2 * (x - self.x_min) / (self.x_max - self.x_min) - 1) for x in x_seq]
+            x_seq_norm = [(2 * (x - x_min_mx) / (x_max_mx - x_min_mx) - 1) for x in x_seq]
 
             params = self.params
             
@@ -145,7 +148,7 @@ class CA_Model:
                 params[2][0], params[2][1]
             )
 
-            output = ((output + 1) / 2) * (self.x_max[:2] - self.x_min[:2]) + self.x_min[:2]
+            output = ((output + 1) / 2) * (x_max_mx[:2] - x_min_mx[:2]) + x_min_mx[:2]
 
             y_k = ca.vertcat(y_k, output)
             u_k = ca.vertcat(u_k, u_k[-2:])
