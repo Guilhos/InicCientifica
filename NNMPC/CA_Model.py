@@ -117,19 +117,22 @@ class CA_Model:
 
     def build_model_mpc(self,p,m,ny,nu,steps):
 
-        y_k1 = ca.MX.sym(f'y_k', ny*steps, 1) # Sequência de entrada simbólica
+        y_k1 = ca.MX.sym('y_k', ny*steps, 1) # Sequência de entrada simbólica
         y_k = y_k1
 
-        u_k1 = ca.MX.sym(f'u_k', nu*steps, 1)  # Sequência de entrada simbólica
+        u_k1 = ca.MX.sym('u_k', nu*steps, 1)  # Sequência de entrada simbólica
         u_k = u_k1
 
-        du_k = ca.MX.sym(f'du_k', nu*m, 1) # Sequência de entrada simbólica
+        du_k = ca.MX.sym('du_k', nu*m, 1) # Sequência de entrada simbólica
 
         x_min_mx = ca.MX(self.x_min)
         x_max_mx = ca.MX(self.x_max)
 
+        u_k_new = u_k
         for i in range(m):
-                u_k[-2*(3-i):-2*(3-i)+1] = u_k[-2*(3-i):-2*(3-i)+1] + du_k[2*i:2*i+1]
+            u_k_new += ca.vertcat(ca.MX.zeros(nu*(steps-m)), du_k[nu*i:nu*i+1])
+
+        u_k = u_k_new
 
         for j in range (p):
             x_seq = [ca.vertcat(y_k[-ny*steps],y_k[-ny*steps+1],u_k[-nu*steps],u_k[-nu*steps+1]),
@@ -154,6 +157,8 @@ class CA_Model:
             u_k = ca.vertcat(u_k, u_k[-2:])
 
         print(type(y_k1), type(u_k1), type(du_k), type(y_k))
+        print(isinstance(y_k, ca.MX))
+        y_k = y_k[6:]
 
         return ca.Function('CA_Model_MPC', [y_k1, u_k1, du_k], [y_k])
 
@@ -190,8 +195,8 @@ if __name__ == '__main__':
     # Extrai cada linha de x0
     #print(Modelo.f_function)
 
-    
-    saida = Modelo.pred_function([y0,u0,dU])
+    dU = [[0],[0],[0],[0],[0],[0]]
+    saida = Modelo.pred_function(ca.DM(y0),ca.DM(u0),ca.DM(dU))
 
     print(x0.shape)
     print("Saída da rede CasADi:", saida)
