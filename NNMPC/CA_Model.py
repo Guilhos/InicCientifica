@@ -5,7 +5,7 @@ import casadi as ca
 
 
 class CA_Model:
-    def __init__(self, modelpath):
+    def __init__(self, modelpath, p, m, nY, nU, steps):
         # Carregar os pesos do modelo salvos
         model_path = modelpath
         state_dict = torch.load(model_path)
@@ -60,6 +60,7 @@ class CA_Model:
 
         self.params = params
         self.f_function = self._build_model()
+        self.pred_function = self.build_model_mpc(p, m, nY, nU, steps)
 
     def sigmoid(self, x):
         return 1 / (1 + ca.exp(-x))
@@ -116,36 +117,42 @@ class CA_Model:
 
     def build_model_mpc(self,p,m,ny,nu,steps):
 
-        y_k = ca.MX.sym(f'y_{i}', ny*steps, 1) # Sequência de entrada simbólica
+        y_k1 = ca.MX.sym(f'y_k', ny*steps, 1) # Sequência de entrada simbólica
+        y_k = y_k1
 
-        u_k = ca.MX.sym(f'u_{i}', nu*steps, 1)  # Sequência de entrada simbólica
+        u_k1 = ca.MX.sym(f'u_k', nu*steps, 1)  # Sequência de entrada simbólica
+        u_k = u_k1
 
-        du_k = ca.MX.sym(f'du_{i}', nu*m, 1) # Sequência de entrada simbólica
+        du_k = ca.MX.sym(f'du_k', nu*m, 1) # Sequência de entrada simbólica
 
         for i in range(m):
-            u_k[-2*(3-i):-2*(3-i)+1] = u_k[-2*(3-i):-2*(3-i)+1] + du_k[2*i:2*i+1]
-        
-        x_seq = [[y_k[-ny*steps],y_k[-ny*steps+1],u_k[-nu*steps],u_k[-nu*steps+1]],
-                 [y_k[-ny*(steps-1)],y_k[-ny*(steps-1)+1],u_k[-nu*(steps-1)],u_k[-nu*(steps-1)+1]],
-                 [y_k[-ny*(steps-2)],y_k[-ny*(steps-2)+1],u_k[-nu*(steps-2)],u_k[-nu*(steps-2)+1]]]
+                u_k[-2*(3-i):-2*(3-i)+1] = u_k[-2*(3-i):-2*(3-i)+1] + du_k[2*i:2*i+1]
 
-        x_seq_norm = [(2 * (x - self.x_min) / (self.x_max - self.x_min) - 1) for x in x_seq]
+        for j in range (p):
+            x_seq = [ca.vertcat(y_k[-ny*steps],y_k[-ny*steps+1],u_k[-nu*steps],u_k[-nu*steps+1]),
+                    ca.vertcat(y_k[-ny*(steps-1)],y_k[-ny*(steps-1)+1],u_k[-nu*(steps-1)],u_k[-nu*(steps-1)+1]),
+                    ca.vertcat(y_k[-ny*(steps-2)],y_k[-ny*(steps-2)+1],u_k[-nu*(steps-2)],u_k[-nu*(steps-2)+1])]
+            
+            x_seq_norm = [(2 * (x - self.x_min) / (self.x_max - self.x_min) - 1) for x in x_seq]
 
-        params = self.params
-        
-        output = self.dense_layer(
-            self.dense_layer(
-                self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], np.zeros((60, 1)), np.zeros((60, 1))),
-                params[1][0], params[1][1]
-            ),
-            params[2][0], params[2][1]
-        )
+            params = self.params
+            
+            output = self.dense_layer(
+                self.dense_layer(
+                    self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], np.zeros((60, 1)), np.zeros((60, 1))),
+                    params[1][0], params[1][1]
+                ),
+                params[2][0], params[2][1]
+            )
 
-        output = ((output + 1) / 2) * (self.x_max[:2] - self.x_min[:2]) + self.x_min[:2]
+            output = ((output + 1) / 2) * (self.x_max[:2] - self.x_min[:2]) + self.x_min[:2]
 
-        y_k.append(output)
+            y_k = ca.vertcat(y_k, output)
+            u_k = ca.vertcat(u_k, u_k[-2:])
 
-        return ca.Function('CA_Model_MPC', [y_k, u_k, du_k], [y_k])
+        print(type(y_k1), type(u_k1), type(du_k), type(y_k))
+
+        return ca.Function('CA_Model_MPC', [y_k1, u_k1, du_k], [y_k])
 
         
 
@@ -158,7 +165,7 @@ if __name__ == '__main__':
     sim = Simulation(3,3)
     sim_mf = Simulation(1,1)
     y0, u0 = sim.pIniciais()
-    nU = len(u0) / m
+    nU = len(u0) // m
     dU = [[0],[0],[0],[0],[0],[0]]
     dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
     yPlanta = sim_mf.pPlanta(y0,dU)
@@ -175,15 +182,13 @@ if __name__ == '__main__':
     #print(x0)
 
     # Criar a instância da rede CasADi
-    Modelo = CA_Model("NNMPC/libs/modelo_treinado.pth")
+    Modelo = CA_Model("NNMPC/libs/modelo_treinado.pth", p, m, nU, nU, 3)
     
     # Extrai cada linha de x0
     #print(Modelo.f_function)
 
-    for i in range(1):
-        saida = Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:]))
-        x0 = np.append(x0,saida)
-        x0 = np.append(x0,x0[-4:-2])
+    
+    saida = Modelo.pred_function([y0,u0,dU])
 
     print(x0.shape)
     print("Saída da rede CasADi:", saida)

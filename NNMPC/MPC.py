@@ -119,8 +119,8 @@ class PINN_MPC():
     def run(self):
         self.ajusteMatrizes()
         xmk = []
-        ymk, umk = self.sim_pred.pIniciais()
-        ypk, uk = ymk[-self.nY:], umk[-self.nU:]
+        ymk, umk = self.sim_pred.pIniciais() # Recebe os pontos iniciais, ymk [6,1] umk [6,1]
+        ypk, uk = ymk[-self.nY:], umk[-self.nU:] 
         
         Ypk = []
         Uk = []
@@ -131,7 +131,6 @@ class PINN_MPC():
 
         iter = 500
         for i in range(iter):
-            
             dU_opt = self.otimizar(ymk[-self.timesteps*self.nU*self.nY:],umk[-self.timesteps*self.nU*self.nY:], ypk)
             umk = np.append(umk, dU_opt[:self.nU])
             umk = umk[2:]
