@@ -57,7 +57,7 @@ if __name__ == '__main__':
     dU = np.concatenate((np.array(dU), np.zeros((nU * (p-m), 1))))
 
     # Y do Modelo
-    NNModel = NN_Model(1,1)
+    NNModel = NN_Model(50,3)
     y,u = NNModel.run(y0,u0,dU)
     print(y)
 

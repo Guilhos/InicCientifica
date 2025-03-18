@@ -29,13 +29,13 @@ class PINN_MPC():
         # Limites das variáveis
         self.u_min = np.array([[0.35], [27e3]])
         self.u_max = np.array([[0.65], [5e4]])
-        self.dU_min = np.array([[0.01], [500]])
+        self.dU_min = np.array([[-0.15], [-5000]])
         self.dU_max = np.array([[0.15], [5000]])
         self.y_min = np.array([[3.5], [5.27]])
         self.y_max = np.array([[12.3], [10.33]])
 
         # Setpoint provisório
-        self.y_sp = np.array([[10], [8]])
+        self.y_sp = np.array([[7.74555396], [6.66187275]])
     
     # Ajuste das Matrizes
 
@@ -49,6 +49,16 @@ class PINN_MPC():
         X_matrix = np.full((n,n),0, dtype=np.float64)
         np.fill_diagonal(X_matrix,x)
         return X_matrix
+    
+    def matriz_triangular_identidade(self, m, n, N):
+        matriz = np.zeros((m * N, n * N))
+        
+        for i in range(m):
+            for j in range(n):
+                if j <= i:
+                    matriz[i * N:(i + 1) * N, j * N:(j + 1) * N] = np.eye(N)
+        
+        return ca.DM(matriz)  # Convertendo para CasADi DM
 
     def ajusteMatrizes(self):
         self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1)
@@ -76,16 +86,21 @@ class PINN_MPC():
 
         yModelk = ca.DM(yModelk)
         yPlantak = ca.DM(yPlantak)
+        uModelk = ca.DM(uModelk)
+        
         dYk = yPlantak - yModelk[-self.nY:]
         dYk = ca.DM(self.iTil(dYk,self.p).reshape(-1,1))
 
         dU_init = ca.DM(self.dU)
         
-        yModel_pred = self.CAMod.pred_function(yModelk,ca.DM(uModelk),dUs)
+        yModel_pred = self.CAMod.pred_function(yModelk,uModelk,dUs)
+        yModel_init = self.CAMod.pred_function(yModelk,uModelk,dU_init)
         
-        g = ca.vertcat(yModel_pred, uModelk + dUs, Fs - (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
+        matriz_inferior =  self.matriz_triangular_identidade(self.steps,self.steps,self.nU)
         
-        x0 = ca.vertcat(dU_init, (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
+        g = ca.vertcat(yModel_pred, self.iTil(uModelk[-2:], self.steps) + matriz_inferior @ dUs, Fs - (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
+        
+        x0 = ca.vertcat(dU_init, (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
 
         x_min = ca.vertcat(self.dU_min, 0)
         x_max = ca.vertcat(self.dU_max, 10e12)
@@ -100,7 +115,7 @@ class PINN_MPC():
         sol = solver(x0 = x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
         # Extraindo os resultados
         dU_opt = sol['x']
-        return dU_opt
+        return dU_opt[:-1]
     
     def run(self):
         self.ajusteMatrizes()
@@ -115,46 +130,55 @@ class PINN_MPC():
         Ymink = []
         Ymaxk = []
 
-        iter = 500
+        iter = 100
         for i in range(iter):
-            dU_opt = self.otimizar(ymk[-self.steps*self.nU*self.nY:],umk[-self.steps*self.nU*self.nY:], ypk)
-            umk = np.append(umk, dU_opt[:self.nU])
-            umk = umk[2:]
+            dU_opt = self.otimizar(ymk, umk, ypk)
+            
+            self.dU = ca.vertcat(self.dU, self.dU[-2:])
+            self.dU = self.dU[2:]
+            self.dU[-2:] = dU_opt[:2]
+            
+            umk = np.append(umk, umk[-self.nU:] + self.dU[-self.nU:])
+            umk = umk[self.nU:]
+            
             xm_2 = ca.vertcat(ymk[-6:-4],umk[-6:-4])
             xm_1 = ca.vertcat(ymk[-4:-2],umk[-4:-2])
             xmk = ca.vertcat(ymk[-2:],umk[-2:])
-            ypk = self.sim_mf.pPlanta(ypk, dU_opt[:self.nU])
+            
+            ypk = self.sim_mf.pPlanta(ypk, self.dU[-self.nU:])
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
             ymk = np.append(ymk, ymk_next)
             ymk = ymk[2:]
 
             Ypk.append(ypk)
-
             print(dU_opt[:6])
+            print('teste')
 
-        # fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+            
 
-        # x = np.linspace(0,iter*self.p,iter*self.p)
-        # y_spM = np.full_like(x, self.y_sp[0])
-        # y_spP = np.full_like(x, self.y_sp[1])
-        # axes[0].plot(x, np.array(resM).reshape(iter * p, 1), label="resM")
-        # axes[0].plot(x, y_spM, linestyle="--", color="red", label="y_sp")
-        # axes[0].set_title("resM")
-        # axes[0].set_ylabel("Valor")
-        # axes[0].legend()
-        # axes[0].grid()
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
 
-        # axes[1].plot(x, np.array(resP).reshape(iter * p, 1), label="resP", color="green")
-        # axes[1].plot(x, y_spP, linestyle="--", color="red", label="y_sp")
-        # axes[1].set_title("resP")
-        # axes[1].legend()
-        # axes[1].grid()
+        x = np.linspace(0,iter*self.p,iter*self.p)
+        y_spM = np.full_like(x, self.y_sp[0])
+        y_spP = np.full_like(x, self.y_sp[1])
+        axes[0].plot(x, np.array(resM).reshape(iter * p, 1), label="resM")
+        axes[0].plot(x, y_spM, linestyle="--", color="red", label="y_sp")
+        axes[0].set_title("resM")
+        axes[0].set_ylabel("Valor")
+        axes[0].legend()
+        axes[0].grid()
 
-        # plt.xlabel("Tempo")
-        # plt.suptitle("Comparação de resM e resP")
-        # plt.tight_layout()
+        axes[1].plot(x, np.array(resP).reshape(iter * p, 1), label="resP", color="green")
+        axes[1].plot(x, y_spP, linestyle="--", color="red", label="y_sp")
+        axes[1].set_title("resP")
+        axes[1].legend()
+        axes[1].grid()
 
-        # plt.show()
+        plt.xlabel("Tempo")
+        plt.suptitle("Comparação de resM e resP")
+        plt.tight_layout()
+
+        plt.show()
 
         return dU_opt
 

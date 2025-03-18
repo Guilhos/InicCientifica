@@ -10,7 +10,7 @@ class Simulation:
         self.P1 = 4.5
         self.P_out = 5
         self.C = 479
-        self.alphas = [0.5,0.5,0.55]
+        self.alphas = [0.5,0.5,0.5]
         self.N_RotS = [38500,38500,38500]
         self.dt = dt
         self.y = []
@@ -77,8 +77,8 @@ class Simulation:
     def pPlanta(self, y0, dU):
         self.y = []
         for k in range(self.m):
-            self.alphas[-1] += dU[0].item()
-            self.N_RotS[-1] += dU[0].item()
+            self.alphas[-1] += dU[0]
+            self.N_RotS[-1] += dU[1]
         init_m = y0[-2].item()
         init_p = y0[-1].item()
 

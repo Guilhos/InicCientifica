@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 import casadi as ca
 
 
@@ -128,13 +127,14 @@ class CA_Model:
         x_min_mx = ca.MX(self.x_min)
         x_max_mx = ca.MX(self.x_max)
 
-        u_k_new = u_k
-        for i in range(m):
-            u_k_new += ca.vertcat(ca.MX.zeros(nu*(steps-m)), du_k[nu*i:nu*i+1])
-
-        u_k = u_k_new
-
         for j in range (p):
+            if j < m:
+                u_k_new = u_k
+                u_k_new = ca.vertcat(u_k_new, u_k_new[-2:])
+                u_k_new = u_k_new[2:]
+                u_k_new[-2:] = u_k_new[-2:] + du_k[nu*j:nu*j+2]
+                u_k = u_k_new
+
             x_seq = [ca.vertcat(y_k[-ny*steps],y_k[-ny*steps+1],u_k[-nu*steps],u_k[-nu*steps+1]),
                     ca.vertcat(y_k[-ny*(steps-1)],y_k[-ny*(steps-1)+1],u_k[-nu*(steps-1)],u_k[-nu*(steps-1)+1]),
                     ca.vertcat(y_k[-ny*(steps-2)],y_k[-ny*(steps-2)+1],u_k[-nu*(steps-2)],u_k[-nu*(steps-2)+1])]
@@ -154,7 +154,6 @@ class CA_Model:
             output = ((output + 1) / 2) * (x_max_mx[:2] - x_min_mx[:2]) + x_min_mx[:2]
 
             y_k = ca.vertcat(y_k, output)
-            u_k = ca.vertcat(u_k, u_k[-2:])
 
         print(type(y_k1), type(u_k1), type(du_k), type(y_k))
         print(isinstance(y_k, ca.MX))
