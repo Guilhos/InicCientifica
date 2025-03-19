@@ -54,8 +54,14 @@ class CA_Model:
         # Organizar os pesos e bias no formato esperado
         params = [LSTM,Dense1,Dense2]
 
-        self.x_min = ca.DM(np.array([[3.4846e+00], [5.2707e+00], [3.4151e-01], [2.5049e+04]]))
-        self.x_max = ca.DM(np.array([[1.2275e+01], [1.0323e+01], [6.5596e-01], [5.2308e+04]]))
+        self.x_min = ca.DM(np.array([[3.48464846611022949219e+00],
+                                     [5.27074575424194335938e+00],
+                                     [3.41506481170654296875e-01],
+                                     [2.50494472656250000000e+04]]))
+        self.x_max = ca.DM(np.array([[1.22746238708496093750e+01],
+                                     [1.03225421905517578125e+01],
+                                     [6.55958950519561767578e-01],
+                                     [5.23078359375000000000e+04]]))
 
         self.params = params
         self.f_function = self._build_model()
@@ -104,7 +110,7 @@ class CA_Model:
         
         output = self.dense_layer(
             self.dense_layer(
-                self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], np.zeros((60, 1)), np.zeros((60, 1))),
+                self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(60, 1), ca.DM.zeros(60, 1)),
                 params[1][0], params[1][1]
             ),
             params[2][0], params[2][1]
@@ -145,7 +151,7 @@ class CA_Model:
             
             output = self.dense_layer(
                 self.dense_layer(
-                    self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], np.zeros((60, 1)), np.zeros((60, 1))),
+                    self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(60, 1), ca.DM.zeros(60, 1)),
                     params[1][0], params[1][1]
                 ),
                 params[2][0], params[2][1]
