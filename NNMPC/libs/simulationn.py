@@ -114,7 +114,7 @@ class Simulation:
 
 if __name__ == '__main__':
 
-    dU = [0.07,1000,-0.1,-2500,0.03,1500]
+    dU = [0,0,0,0,0,0]
     sim = Simulation(50,3)
     y0, u0 = sim.pIniciais()
     print(y0.shape, y0, u0)

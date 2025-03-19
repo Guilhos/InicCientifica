@@ -170,7 +170,7 @@ if __name__ == '__main__':
     m = 3
 
     sim = Simulation(3,3)
-    sim_mf = Simulation(1,1)
+    sim_mf = Simulation(50,3)
     y0, u0 = sim.pIniciais()
     nU = len(u0) // m
     dU = [[0],[0],[0],[0],[0],[0]]
@@ -196,9 +196,14 @@ if __name__ == '__main__':
 
     dU = [[0],[0],[0],[0],[0],[0]]
     saida = Modelo.pred_function(ca.DM(y0),ca.DM(u0),ca.DM(dU))
+    saida2 = []
+    for i in range(50):
+        saida2.append(Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:])))
+        y0 = ca.vertcat(y0, saida2[-1])
 
     print(x0.shape)
     print("Saída da rede CasADi:", saida)
+    print("Saída da rede CasADi:", saida2)
     print(yPlanta)
-    #print(yPlanta - saida)
+    print(yPlanta - saida)
     #print('AAAA')
