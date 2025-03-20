@@ -64,6 +64,7 @@ class CA_Model:
                                      [27258.388671875+25049.447265625]]))
 
         self.params = params
+        self.steps = steps
         self.f_function = self._build_model()
         self.pred_function = self.build_model_mpc(p, m, nY, nU, steps)
 
@@ -102,7 +103,7 @@ class CA_Model:
         return ca.tanh(z) if activation == 'tanh' else z
 
     def _build_model(self):
-        x_seq = [ca.MX.sym(f'x_{i}', 4, 1) for i in range(3)]  # Sequência de entrada simbólica
+        x_seq = [ca.MX.sym(f'x_{i}', 4, 1) for i in range(self.steps)]  # Sequência de entrada simbólica
 
         x_seq_norm = [(2 * (x - self.x_min) / (self.x_max - self.x_min) - 1) for x in x_seq]
 
@@ -161,8 +162,6 @@ class CA_Model:
 
             y_k = ca.vertcat(y_k, output)
 
-        print(type(y_k1), type(u_k1), type(du_k), type(y_k))
-        print(isinstance(y_k, ca.MX))
         y_k = y_k[6:]
 
         return ca.Function('CA_Model_MPC', [y_k1, u_k1, du_k], [y_k])
@@ -193,7 +192,6 @@ if __name__ == '__main__':
         saida2.append(Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:])))
         y0 = ca.vertcat(y0, saida2[-1])
 
-    print(x0.shape)
     print("Saída da rede CasADi:", saida)
     print("Saída da rede CasADi:", saida2)
     print(yPlanta)

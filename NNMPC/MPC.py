@@ -73,8 +73,8 @@ class PINN_MPC():
         self.dU_max = self.iTil(self.dU_max, self.m) # Expansão do dU_max para M. SHAPE -> (nU*M, 1)
         #self.dU_max = ca.DM(np.concatenate((self.dU_max,np.zeros((int(self.nU) * (self.p - self.m), 1))))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
 
-        self.q = ca.DM(self.diagMatrix(self.q,self.nY*self.p)) # Criação de uma matriz com os valores de Q na diagonal. SHAPE -> (nY*p, nY*p)
-        self.r = ca.DM(self.diagMatrix(self.r,self.nU*self.m)) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
+        self.q = ca.DM(np.diag(np.array([q[0],q[1]] * (self.nY*self.p // 2)))) # Criação de uma matriz com os valores de Q na diagonal. SHAPE -> (nY*p, nY*p)
+        self.r = ca.DM(np.diag(np.array([r[0],r[1]] * (self.nU*self.m // 2)))) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
 
     # Otimização
 
@@ -181,7 +181,7 @@ class PINN_MPC():
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 50, 3, 0.1, 1, 3
+    p, m, q, r, steps = 50, 3, [0.1,0.1], [1, 0.001], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
