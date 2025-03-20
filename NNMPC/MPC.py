@@ -154,8 +154,6 @@ class PINN_MPC():
             print(dU_opt[:6])
             print('teste')
 
-            
-
         fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
 
         x = np.linspace(0,iter*self.p,iter*self.p)

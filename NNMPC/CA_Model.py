@@ -54,14 +54,14 @@ class CA_Model:
         # Organizar os pesos e bias no formato esperado
         params = [LSTM,Dense1,Dense2]
 
-        self.x_min = ca.DM(np.array([[3.48464846611022949219e+00],
-                                     [5.27074575424194335938e+00],
-                                     [3.41506481170654296875e-01],
-                                     [2.50494472656250000000e+04]]))
-        self.x_max = ca.DM(np.array([[1.22746238708496093750e+01],
-                                     [1.03225421905517578125e+01],
-                                     [6.55958950519561767578e-01],
-                                     [5.23078359375000000000e+04]]))
+        self.x_min = ca.DM(np.array([[3.4846484661102295],
+                                     [5.270745754241943],
+                                     [0.3415064811706543],
+                                     [25049.447265625]]))
+        self.x_max = ca.DM(np.array([[8.7899751663208+3.4846484661102295],
+                                     [5.0517964363098145+5.270745754241943],
+                                     [0.31445246934890747+0.3415064811706543],
+                                     [27258.388671875+25049.447265625]]))
 
         self.params = params
         self.f_function = self._build_model()
@@ -96,7 +96,7 @@ class CA_Model:
         
         return ca.horzcat(h_t)  # Concatena ao longo do tempo
 
-    def dense_layer(self, x, W, b, activation='tanh'):
+    def dense_layer(self, x, W, b, activation):
         """ Camada densa com ativação """
         z = W @ x + b
         return ca.tanh(z) if activation == 'tanh' else z
@@ -111,9 +111,9 @@ class CA_Model:
         output = self.dense_layer(
             self.dense_layer(
                 self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(60, 1), ca.DM.zeros(60, 1)),
-                params[1][0], params[1][1]
+                params[1][0], params[1][1],'tanh'
             ),
-            params[2][0], params[2][1]
+            params[2][0], params[2][1],'none'
         )
 
         output = ((output + 1) / 2) * (self.x_max[:2] - self.x_min[:2]) + self.x_min[:2]
@@ -152,9 +152,9 @@ class CA_Model:
             output = self.dense_layer(
                 self.dense_layer(
                     self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(60, 1), ca.DM.zeros(60, 1)),
-                    params[1][0], params[1][1]
+                    params[1][0], params[1][1],'tanh'
                 ),
-                params[2][0], params[2][1]
+                params[2][0], params[2][1], 'none'
             )
 
             output = ((output + 1) / 2) * (x_max_mx[:2] - x_min_mx[:2]) + x_min_mx[:2]
@@ -182,23 +182,9 @@ if __name__ == '__main__':
     dU = [[0],[0],[0],[0],[0],[0]]
     dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
     yPlanta = sim_mf.pPlanta(y0,dU)
-    #print(y0, u0)
-    x0 = []
-
-    # Iterar pelos dois arrays e intercalar 2 elementos de cada vez
-    for i in range(0, len(y0), 2):
-        x0.append(y0[i:i+2])  # Adiciona 2 elementos de y
-        x0.append(u0[i:i+2])  # Adiciona 2 elementos de u
-
-    # Transformar o x0ado em um array numpy
-    x0 = np.vstack(x0)
-    #print(x0)
 
     # Criar a instância da rede CasADi
     Modelo = CA_Model("NNMPC/libs/modelo_treinado.pth", p, m, nU, nU, 3)
-    
-    # Extrai cada linha de x0
-    #print(Modelo.f_function)
 
     dU = [[0],[0],[0],[0],[0],[0]]
     saida = Modelo.pred_function(ca.DM(y0),ca.DM(u0),ca.DM(dU))
