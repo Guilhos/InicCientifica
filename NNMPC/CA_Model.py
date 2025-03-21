@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import casadi as ca
+import matplotlib.pyplot as plt
 
 
 class CA_Model:
@@ -171,11 +172,11 @@ class CA_Model:
 if __name__ == '__main__':
     from libs.simulationn import Simulation
 
-    p = 50
+    p = 100
     m = 3
 
     sim = Simulation(3,3)
-    sim_mf = Simulation(50,3)
+    sim_mf = Simulation(100,3)
     y0, u0 = sim.pIniciais()
     nU = len(u0) // m
     dU = [[0],[0],[0],[0],[0],[0]]
@@ -188,12 +189,19 @@ if __name__ == '__main__':
     dU = [[0],[0],[0],[0],[0],[0]]
     saida = Modelo.pred_function(ca.DM(y0),ca.DM(u0),ca.DM(dU))
     saida2 = []
-    for i in range(50):
+    for i in range(200):
         saida2.append(Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:])))
         y0 = ca.vertcat(y0, saida2[-1])
+    saida2 = np.array(saida2)
 
-    print("Saída da rede CasADi:", saida)
-    print("Saída da rede CasADi:", saida2)
-    print(yPlanta)
-    print(yPlanta - saida)
+    x = np.linspace(0, 100, 100)
+    plt.plot(x, yPlanta[::2,0])
+    plt.plot(x, saida[::2,0])
+    plt.plot(x, saida2[::2,0])
+    plt.legend(['Planta', 'Rede 1', 'Rede 2'])
+    plt.show()
+    # print("Saída da rede CasADi:", saida)
+    # print("Saída da rede CasADi:", saida2)
+    # print(yPlanta)
+    # print(yPlanta - saida)
     #print('AAAA')

@@ -89,6 +89,7 @@ class PINN_MPC():
         uModelk = ca.DM(uModelk)
         
         dYk = yPlantak - yModelk[-self.nY:]
+        print(dYk)
         dYk = ca.DM(self.iTil(dYk,self.p).reshape(-1,1))
 
         dU_init = ca.DM(self.dU)
@@ -115,7 +116,7 @@ class PINN_MPC():
         sol = solver(x0 = x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
         # Extraindo os resultados
         dU_opt = sol['x']
-        return dU_opt[:-1]
+        return dU_opt[:-1], solver.stats()['return_status']
     
     def run(self):
         self.ajusteMatrizes()
@@ -130,13 +131,22 @@ class PINN_MPC():
         Ymink = []
         Ymaxk = []
 
-        iter = 100
+        iter = 20
         for i in range(iter):
-            dU_opt = self.otimizar(ymk, umk, ypk)
-            
-            self.dU = ca.vertcat(self.dU, self.dU[-2:])
-            self.dU = self.dU[2:]
-            self.dU[-2:] = dU_opt[:2]
+            print(15*'='+ f'Iteração {i+1}' + 15*'=')
+            dU_opt, stats = self.otimizar(ymk, umk, ypk)
+            print(stats)
+            if stats == 'Solve_Succeeded':
+                self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
+                self.dU = self.dU[2:]
+                self.dU[-2:] = dU_opt[:2]
+                dUSuccess = dU_opt[2:]
+            elif stats == 'Infeasible_Problem_Detected':
+                dUSuccess = ca.vertcat(dUSuccess, np.zeros((self.nU, 1)))
+                self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
+                self.dU = self.dU[2:]
+                self.dU[-2:] = dUSuccess[:2]
+                dUSuccess = dUSuccess[2:]
             
             umk = np.append(umk, umk[-self.nU:] + self.dU[-self.nU:])
             umk = umk[self.nU:]
@@ -146,27 +156,31 @@ class PINN_MPC():
             xmk = ca.vertcat(ymk[-2:],umk[-2:])
             
             ypk = self.sim_mf.pPlanta(ypk, self.dU[-self.nU:])
+            ypk = ypk.flatten()
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
             ymk = np.append(ymk, ymk_next)
             ymk = ymk[2:]
 
+            Ymk.append(ymk[-2:])
             Ypk.append(ypk)
             print(dU_opt[:6])
             print('teste')
 
         fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
 
-        x = np.linspace(0,iter*self.p,iter*self.p)
+        x = np.linspace(0,iter,iter)
         y_spM = np.full_like(x, self.y_sp[0])
         y_spP = np.full_like(x, self.y_sp[1])
-        axes[0].plot(x, np.array(resM).reshape(iter * p, 1), label="resM")
+        axes[0].plot(x, np.array(Ymk)[:,0], label="resM", color = 'green')
+        axes[0].plot(x, np.array(Ypk)[:,0], label="plantaM", color="blue")
         axes[0].plot(x, y_spM, linestyle="--", color="red", label="y_sp")
         axes[0].set_title("resM")
         axes[0].set_ylabel("Valor")
         axes[0].legend()
         axes[0].grid()
 
-        axes[1].plot(x, np.array(resP).reshape(iter * p, 1), label="resP", color="green")
+        axes[1].plot(x, np.array(Ymk)[:,1], label="resP", color="green")
+        axes[1].plot(x, np.array(Ypk)[:,1], label="plantaM", color="blue")
         axes[1].plot(x, y_spP, linestyle="--", color="red", label="y_sp")
         axes[1].set_title("resP")
         axes[1].legend()
@@ -181,7 +195,7 @@ class PINN_MPC():
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 50, 3, [0.1,0.1], [1, 0.001], 3
+    p, m, q, r, steps = 50, 3, [1,0.1], [1, 1000], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
