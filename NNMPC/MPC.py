@@ -104,13 +104,13 @@ class PINN_MPC():
         x0 = ca.vertcat(dU_init, (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
 
         x_min = ca.vertcat(self.dU_min, 0)
-        x_max = ca.vertcat(self.dU_max, 10e12)
+        x_max = ca.vertcat(self.dU_max, 10e23)
 
         lbg = ca.vertcat(self.y_min, self.u_min, 0) 
         ubg = ca.vertcat(self.y_max, self.u_max, 0)
 
         nlp = {'x': x, 'f': Fs, 'g': g}
-        options = {'print_time': False}
+        options = {'print_time': False, 'ipopt': {'print_level': 0}}
         solver = ca.nlpsol('solver', 'ipopt', nlp, options)
 
         sol = solver(x0 = x0, lbg = lbg, ubg = ubg, lbx = x_min, ubx = x_max)
@@ -125,37 +125,36 @@ class PINN_MPC():
         ypk, uk = ymk[-self.nY:], umk[-self.nU:] 
         
         Ypk = []
-        Uk = []
+        Upk = []
         Ymk = []
-        Yspk = []
+        YspM = []
+        YspP = []
         Ymink = []
         Ymaxk = []
 
-        iter = 20
+        iter = 50
         for i in range(iter):
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
             dU_opt, stats = self.otimizar(ymk, umk, ypk)
             print(stats)
             if stats == 'Solve_Succeeded':
-                self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
+                self.dUk = dU_opt[:self.nU]
+                self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
                 self.dU = self.dU[2:]
-                self.dU[-2:] = dU_opt[:2]
-                dUSuccess = dU_opt[2:]
             elif stats == 'Infeasible_Problem_Detected':
-                dUSuccess = ca.vertcat(dUSuccess, np.zeros((self.nU, 1)))
+                self.dUk = self.dU[:self.nU]
                 self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
                 self.dU = self.dU[2:]
-                self.dU[-2:] = dUSuccess[:2]
-                dUSuccess = dUSuccess[2:]
             
-            umk = np.append(umk, umk[-self.nU:] + self.dU[-self.nU:])
+            umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
             
             xm_2 = ca.vertcat(ymk[-6:-4],umk[-6:-4])
             xm_1 = ca.vertcat(ymk[-4:-2],umk[-4:-2])
             xmk = ca.vertcat(ymk[-2:],umk[-2:])
             
-            ypk = self.sim_mf.pPlanta(ypk, self.dU[-self.nU:])
+            ypk, upk = self.sim_mf.pPlanta(ypk, self.dUk)
+            upk = upk.flatten()
             ypk = ypk.flatten()
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
             ymk = np.append(ymk, ymk_next)
@@ -163,39 +162,54 @@ class PINN_MPC():
 
             Ymk.append(ymk[-2:])
             Ypk.append(ypk)
+            Upk.append(upk)
             print(dU_opt[:6])
+            YspM.append(self.y_sp[0])
+            YspP.append(self.y_sp[1])
+            if i == 5:
+                self.y_sp = np.array([[10], [8]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            
             print('teste')
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+        fig, axes = plt.subplots(2, 2, figsize=(12, 5), sharex=True)
 
         x = np.linspace(0,iter,iter)
-        y_spM = np.full_like(x, self.y_sp[0])
-        y_spP = np.full_like(x, self.y_sp[1])
-        axes[0].plot(x, np.array(Ymk)[:,0], label="resM", color = 'green')
-        axes[0].plot(x, np.array(Ypk)[:,0], label="plantaM", color="blue")
-        axes[0].plot(x, y_spM, linestyle="--", color="red", label="y_sp")
-        axes[0].set_title("resM")
-        axes[0].set_ylabel("Valor")
-        axes[0].legend()
-        axes[0].grid()
+        YspM = np.array(YspM)
+        YspP = np.array(YspP)
+        axes[0][0].plot(x, np.array(Ymk)[:,0], label="resM", color = 'green')
+        axes[0][0].plot(x, np.array(Ypk)[:,0], label="plantaM", color="blue")
+        axes[0][0].plot(x, YspM.squeeze(), linestyle="--", color="red", label="y_sp")
+        axes[0][0].set_title("Vazão")
+        axes[0][0].set_ylabel("Valor")
+        axes[0][0].legend()
+        axes[0][0].grid()
+        axes[0][0].set_ylim(0,15)
 
-        axes[1].plot(x, np.array(Ymk)[:,1], label="resP", color="green")
-        axes[1].plot(x, np.array(Ypk)[:,1], label="plantaM", color="blue")
-        axes[1].plot(x, y_spP, linestyle="--", color="red", label="y_sp")
-        axes[1].set_title("resP")
-        axes[1].legend()
-        axes[1].grid()
+        axes[0][1].plot(x, np.array(Ymk)[:,1], label="resP", color="green")
+        axes[0][1].plot(x, np.array(Ypk)[:,1], label="plantaM", color="blue")
+        axes[0][1].plot(x, YspP.squeeze(), linestyle="--", color="red", label="y_sp")
+        axes[0][1].set_title("Pressão")
+        axes[0][1].legend()
+        axes[0][1].grid()
+        axes[0][1].set_ylim(0,15)
+        
+        axes[1][0].plot(x, np.array(Upk)[:,0], label="resP", color="green")
+        axes[1][0].set_title("Alpha")
+        axes[1][1].plot(x, np.array(Upk)[:,1], label="resP", color="green")
+        axes[1][1].set_title("Velocidade de rotacao")
 
         plt.xlabel("Tempo")
         plt.suptitle("Comparação de resM e resP")
         plt.tight_layout()
+        
 
         plt.show()
 
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 50, 3, [1,1], [1, 1000], 3
+    p, m, q, r, steps = 50, 3, [8/100,10/100], [1/0.15**2, 1/5000**2], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
