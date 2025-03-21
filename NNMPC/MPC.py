@@ -195,7 +195,7 @@ class PINN_MPC():
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 50, 3, [1,0.1], [1, 1000], 3
+    p, m, q, r, steps = 50, 3, [1,1], [1, 1000], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)

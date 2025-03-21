@@ -138,7 +138,7 @@ alpha_values = []
 RNN_train = []
 RNN_trainFut = []
 
-lut = Interpolation('/home/guilhermefreire/UFBA-1/Iniciação Científica/Sistema de Compressão/tabela_phi.csv')
+lut = Interpolation('E:/Documentos/Workspace/InicCientifica/Sistema de Compressão/tabela_phi.csv')
 lut.load_data()
 interpolation = lut.interpolate()
 # Crie uma instância da classe Simulation
