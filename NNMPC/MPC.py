@@ -77,50 +77,82 @@ class PINN_MPC():
         self.r = ca.DM(np.diag(np.array([r[0],r[1]] * (self.nU*self.m // 2)))) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
 
     def nlp_func(self):
-        yModelk = ca.MX.sym('yModelk', self.nY*self.steps, 1)
-        uModelk = ca.MX.sym('uModelk', self.nU*self.steps, 1)
-        yPlantak = ca.MX.sym('yPlantak', self.nY, 1)
-        dUs = ca.MX.sym('dU',self.nU*self.m, 1)
-        Fs = ca.MX.sym('f')
+        # Criando o problema de otimização
+        opti = ca.Opti()
+
+        # Definição das variáveis de decisão
+        yModelk = opti.parameter(self.nY * self.steps, 1)
+        uModelk = opti.parameter(self.nU * self.steps, 1)
+        yPlantak = opti.parameter(self.nY, 1)  # yPlantak como parâmetro
+        dUs = opti.variable(self.nU * self.m, 1)
+        Fs = opti.variable(1, 1)  # Variável escalar para Fs
 
         x = ca.vertcat(dUs, Fs)
-        
+
+        # Erro entre a planta e o modelo
         dYk = yPlantak - yModelk[-self.nY:]
-        print(dYk)
         dYk = ca.repmat(dYk, self.p, 1)
 
-        dU_init = ca.MX(self.dU)
-        
-        yModel_pred = self.CAMod.pred_function(yModelk,uModelk,dUs)
+        # Conversão de constantes para CasADi MX
+        dU_init = ca.DM(self.dU)
+        rF = ca.MX(self.r)
+        qF = ca.MX(self.q)
+
+        # Predição do modelo
+        yModel_pred = self.CAMod.pred_function(yModelk, uModelk, dUs)
         yModel_init = self.CAMod.pred_function(yModelk,uModelk,dU_init)
-        
-        matriz_inferior =  self.matriz_triangular_identidade(self.steps,self.steps,self.nU)
-        
-        g = ca.vertcat(yModel_pred, ca.repmat(uModelk[-2:], self.steps,1) + matriz_inferior @ dUs, Fs - (yModel_pred - self.y_sp + dYk).T @ self.q @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
-        
-        x0 = ca.vertcat(dU_init, (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
 
-        x_min = ca.vertcat(self.dU_min, 0)
-        x_max = ca.vertcat(self.dU_max, 10e23)
+        opti.set_initial(dUs, dU_init)
+        opti.set_initial(Fs, (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
 
-        lbg = ca.vertcat(self.y_min, self.u_min, 0) 
-        ubg = ca.vertcat(self.y_max, self.u_max, 0)
+        # Matriz triangular para os controles
+        matriz_inferior = self.matriz_triangular_identidade(self.steps, self.steps, self.nU)
 
-        return ca.Function('nlp', [yModelk, uModelk, yPlantak, dUs, Fs], [x, Fs, g, x0, x_min, x_max, lbg, ubg])
+        # Função objetivo (custo)
+        custo = (yModel_pred - self.y_sp + dYk).T @ qF @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ rF @ dU_init
+
+        # Restrições
+        g = ca.vertcat(
+            yModel_pred,  # Predição do modelo
+            ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs,  # Controle futuro
+            Fs - custo  # Condição para Fs
+        )
+
+        # x_min e x_max
+        opti.subject_to(self.dU_min <= dUs)
+        opti.subject_to(dUs <= self.dU_max)
+        opti.subject_to(0 <= Fs)
+        opti.subject_to(Fs <= 10e23)
+
+        # lbg e ubg
+        opti.subject_to(self.y_min <= yModel_pred)
+        opti.subject_to(yModel_pred <= self.y_max)
+        opti.subject_to(self.u_min <= ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs)
+        opti.subject_to(ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs <= self.u_max)
+        opti.subject_to(Fs - custo == 0)  # Restrições de igualdade
+
+        # Definição do problema de otimização
+        opti.minimize(Fs)
+        opti.solver('ipopt')
+
+        # Criando a função otimizada
+        return opti.to_function(
+            "opti_nlp",
+            [yModelk, uModelk, yPlantak],
+            [x]
+        )
 
     def otimizar(self, ymk, umk, ypk):
-        dUs = ca.MX.sym('dU', self.nU * self.m, 1)
-        Fs = ca.MX.sym('f')
+        dYk = ypk - ymk[-self.nY:]
+        dYk = ca.repmat(dYk, self.p, 1)
+        dU_init = ca.MX(self.dU)
+        yModel_init = self.CAMod.pred_function(ymk,umk,dU_init)
+        Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
-        x, Fs, g, x0, x_min, x_max, lbg, ubg = self.nlp(ymk, umk, ypk, dUs, Fs)
-        nlp = {'x': x, 'f': Fs, 'g': g}
-        options = {'print_time': False, 'ipopt': {'print_level': 0}}
-        solver = ca.nlpsol('solver', 'ipopt', nlp, options)
-
-        sol = solver(x0=x0, lbg=lbg, ubg=ubg, lbx=x_min, ubx=x_max)
-        # Extraindo os resultados
-        dU_opt = sol['x']
-        return dU_opt[:-1], solver.stats()['return_status']
+        x_opt = self.opti_nlp(ymk, umk, ypk, dU_init, Fs_init)[0]
+        dU_opt = x_opt[:self.nU * self.m]
+        stats = self.opti_nlp.stats()["return_status"]
+        return dU_opt, stats
     
     def run(self):
         self.ajusteMatrizes()
@@ -128,7 +160,7 @@ class PINN_MPC():
         ymk, umk = self.sim_pred.pIniciais() # Recebe os pontos iniciais, ymk [6,1] umk [6,1]
         ypk, uk = ymk[-self.nY:], umk[-self.nU:]
 
-        self.nlp = self.nlp_func()
+        opti_nlp = self.nlp_func()
 
         Ypk = []
         Upk = []
@@ -141,7 +173,9 @@ class PINN_MPC():
         iter = 50
         for i in range(iter):
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
-            dU_opt, stats = self.otimizar(ymk, umk, ypk)
+            x_opt = self.opti_nlp(ymk, umk, ypk)[0]
+            dU_opt = x_opt[:self.nU * self.m]
+            stats = self.opti_nlp.stats()["return_status"]
             print(stats)
             if stats == 'Solve_Succeeded':
                 self.dUk = dU_opt[:self.nU]
