@@ -83,7 +83,8 @@ class PINN_MPC():
         # Definição das variáveis de decisão
         yModelk = opti.parameter(self.nY * self.steps, 1)
         uModelk = opti.parameter(self.nU * self.steps, 1)
-        yPlantak = opti.parameter(self.nY, 1)  # yPlantak como parâmetro
+        yPlantak = opti.parameter(self.nY, 1)
+        ysp = opti.parameter(self.nY * self.p, 1)# yPlantak como parâmetro
         dUs = opti.variable(self.nU * self.m, 1)
         Fs = opti.variable(1, 1)  # Variável escalar para Fs
 
@@ -100,59 +101,50 @@ class PINN_MPC():
 
         # Predição do modelo
         yModel_pred = self.CAMod.pred_function(yModelk, uModelk, dUs)
-        yModel_init = self.CAMod.pred_function(yModelk,uModelk,dU_init)
-
-        opti.set_initial(dUs, dU_init)
-        opti.set_initial(Fs, (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init)
-
+        
         # Matriz triangular para os controles
         matriz_inferior = self.matriz_triangular_identidade(self.steps, self.steps, self.nU)
 
         # Função objetivo (custo)
-        custo = (yModel_pred - self.y_sp + dYk).T @ qF @ (yModel_pred - self.y_sp + dYk) + dU_init.T @ rF @ dU_init
+        custo = (yModel_pred - ysp + dYk).T @ qF @ (yModel_pred - ysp + dYk) + dU_init.T @ rF @ dU_init
 
         # Restrições
-        g = ca.vertcat(
-            yModel_pred,  # Predição do modelo
-            ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs,  # Controle futuro
-            Fs - custo  # Condição para Fs
-        )
-
         # x_min e x_max
-        opti.subject_to(self.dU_min <= dUs)
-        opti.subject_to(dUs <= self.dU_max)
-        opti.subject_to(0 <= Fs)
-        opti.subject_to(Fs <= 10e23)
+        opti.subject_to(opti.bounded(self.dU_min, dUs, self.dU_max))
+        opti.subject_to(opti.bounded(0, Fs, 10e23))
 
         # lbg e ubg
-        opti.subject_to(self.y_min <= yModel_pred)
-        opti.subject_to(yModel_pred <= self.y_max)
-        opti.subject_to(self.u_min <= ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs)
-        opti.subject_to(ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs <= self.u_max)
+        opti.subject_to(opti.bounded(self.y_min, yModel_pred, self.y_max))
+        opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs, self.u_max))
         opti.subject_to(Fs - custo == 0)  # Restrições de igualdade
 
         # Definição do problema de otimização
         opti.minimize(Fs)
-        opti.solver('ipopt')
+        opti.solver('ipopt', {
+            "print_level": 0,            # Desativa a saída do IPOPT
+            "print_timing_statistics": "no",  # Remove estatísticas de tempo
+            "sb": "yes"                  # "Silent barrier" - silencia IPOPT
+        })
 
         # Criando a função otimizada
         return opti.to_function(
             "opti_nlp",
-            [yModelk, uModelk, yPlantak],
+            [yModelk, uModelk, yPlantak, ysp, dUs, Fs],
             [x]
         )
 
     def otimizar(self, ymk, umk, ypk):
         dYk = ypk - ymk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
-        dU_init = ca.MX(self.dU)
+        dU_init = self.dU
         yModel_init = self.CAMod.pred_function(ymk,umk,dU_init)
         Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
-        x_opt = self.opti_nlp(ymk, umk, ypk, dU_init, Fs_init)[0]
+        x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
         dU_opt = x_opt[:self.nU * self.m]
-        stats = self.opti_nlp.stats()["return_status"]
-        return dU_opt, stats
+        #stats = self.opti_nlp.stats()
+        #print(stats)
+        return dU_opt
     
     def run(self):
         self.ajusteMatrizes()
@@ -160,7 +152,7 @@ class PINN_MPC():
         ymk, umk = self.sim_pred.pIniciais() # Recebe os pontos iniciais, ymk [6,1] umk [6,1]
         ypk, uk = ymk[-self.nY:], umk[-self.nU:]
 
-        opti_nlp = self.nlp_func()
+        self.opti_nlp = self.nlp_func()
 
         Ypk = []
         Upk = []
@@ -173,18 +165,19 @@ class PINN_MPC():
         iter = 50
         for i in range(iter):
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
-            x_opt = self.opti_nlp(ymk, umk, ypk)[0]
-            dU_opt = x_opt[:self.nU * self.m]
-            stats = self.opti_nlp.stats()["return_status"]
-            print(stats)
-            if stats == 'Solve_Succeeded':
-                self.dUk = dU_opt[:self.nU]
-                self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
-                self.dU = self.dU[2:]
-            elif stats == 'Infeasible_Problem_Detected':
-                self.dUk = self.dU[:self.nU]
-                self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
-                self.dU = self.dU[2:]
+            dU_opt= self.otimizar(ymk, umk, ypk)
+            #print(stats)
+            self.dUk = dU_opt[:self.nU]
+            self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
+            self.dU = self.dU[2:]
+            # if stats == 'Solve_Succeeded':
+            #     self.dUk = dU_opt[:self.nU]
+            #     self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
+            #     self.dU = self.dU[2:]
+            # elif stats == 'Infeasible_Problem_Detected':
+            #     self.dUk = self.dU[:self.nU]
+            #     self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
+            #     self.dU = self.dU[2:]
             
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
@@ -249,7 +242,7 @@ class PINN_MPC():
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 50, 3, [8/100,10/100], [1/0.15**2, 1/5000**2], 3
+    p, m, q, r, steps = 50, 3, [8/100,1/100], [1/0.15**2, 1000/5000**2], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
