@@ -105,8 +105,6 @@ class Simulation:
             init_m = aux1[-1]
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
-            print('eu to aqui')
-            print(params)
             if j < self.m:
                 self.u.append([self.alphas[j], self.N_RotS[j]])
 

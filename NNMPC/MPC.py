@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import casadi as ca
+import time
 from libs.simulationn import Simulation
 from NN_Model import NN_Model
 from CA_Model import CA_Model
@@ -81,14 +82,17 @@ class PINN_MPC():
         opti = ca.Opti()
 
         # Definição das variáveis de decisão
+        dUs = opti.variable(self.nU * self.m, 1)
+        Fs = opti.variable(1, 1)  # Variável escalar para Fs
         yModelk = opti.parameter(self.nY * self.steps, 1)
         uModelk = opti.parameter(self.nU * self.steps, 1)
         yPlantak = opti.parameter(self.nY, 1)
         ysp = opti.parameter(self.nY * self.p, 1)# yPlantak como parâmetro
-        dUs = opti.variable(self.nU * self.m, 1)
-        Fs = opti.variable(1, 1)  # Variável escalar para Fs
-
+    
         x = ca.vertcat(dUs, Fs)
+        
+        # Definição do problema de otimização
+        opti.minimize(Fs)
 
         # Erro entre a planta e o modelo
         dYk = yPlantak - yModelk[-self.nY:]
@@ -96,17 +100,12 @@ class PINN_MPC():
 
         # Conversão de constantes para CasADi MX
         dU_init = ca.DM(self.dU)
-        rF = ca.MX(self.r)
-        qF = ca.MX(self.q)
 
         # Predição do modelo
         yModel_pred = self.CAMod.pred_function(yModelk, uModelk, dUs)
         
         # Matriz triangular para os controles
         matriz_inferior = self.matriz_triangular_identidade(self.steps, self.steps, self.nU)
-
-        # Função objetivo (custo)
-        custo = (yModel_pred - ysp + dYk).T @ qF @ (yModel_pred - ysp + dYk) + dU_init.T @ rF @ dU_init
 
         # Restrições
         # x_min e x_max
@@ -116,15 +115,18 @@ class PINN_MPC():
         # lbg e ubg
         opti.subject_to(opti.bounded(self.y_min, yModel_pred, self.y_max))
         opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs, self.u_max))
-        opti.subject_to(Fs - custo == 0)  # Restrições de igualdade
+        opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dU_init.T @ self.r @ dU_init == 0)  # Restrições de igualdade
 
-        # Definição do problema de otimização
-        opti.minimize(Fs)
         opti.solver('ipopt', {
-            "print_level": 0,            # Desativa a saída do IPOPT
-            "print_timing_statistics": "no",  # Remove estatísticas de tempo
-            "sb": "yes"                  # "Silent barrier" - silencia IPOPT
+            "print_level": 0,
+            "tol": 1e-6,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
+            "max_iter": 500,                   # Reduz número de iterações (ajustável)
+            "mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
+            "linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
+            "hessian_approximation": "limited-memory",  # Usa L-BFGS para evitar cálculo de Hessiana
+            "sb": "yes"
         })
+        print(opti.debug)
 
         # Criando a função otimizada
         return opti.to_function(
@@ -137,10 +139,16 @@ class PINN_MPC():
         dYk = ypk - ymk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
         dU_init = self.dU
+        tf1 = time.time()
         yModel_init = self.CAMod.pred_function(ymk,umk,dU_init)
+        tf2 = time.time()
+        print(f'Tempo Modelo Pred: {tf2-tf1}')
         Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
+        tnlp1 = time.time()
         x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
+        tnlp2 = time.time()
+        print(f'Tempo NLP: {tnlp2-tnlp1}')
         dU_opt = x_opt[:self.nU * self.m]
         #stats = self.opti_nlp.stats()
         #print(stats)
@@ -150,34 +158,27 @@ class PINN_MPC():
         self.ajusteMatrizes()
         xmk = []
         ymk, umk = self.sim_pred.pIniciais() # Recebe os pontos iniciais, ymk [6,1] umk [6,1]
-        ypk, uk = ymk[-self.nY:], umk[-self.nU:]
+        ypk = ymk[-self.nY:]
 
         self.opti_nlp = self.nlp_func()
 
-        Ypk = []
-        Upk = []
-        Ymk = []
-        YspM = []
-        YspP = []
-        Ymink = []
-        Ymaxk = []
+        Ypk = np.array([])
+        Upk = np.array([])
+        Ymk = np.array([])
+        YspM = np.array([])
+        YspP = np.array([])
+        #Ymink = []
+        #Ymaxk = []
 
         iter = 50
         for i in range(iter):
+            t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
             dU_opt= self.otimizar(ymk, umk, ypk)
             #print(stats)
             self.dUk = dU_opt[:self.nU]
             self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
             self.dU = self.dU[2:]
-            # if stats == 'Solve_Succeeded':
-            #     self.dUk = dU_opt[:self.nU]
-            #     self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
-            #     self.dU = self.dU[2:]
-            # elif stats == 'Infeasible_Problem_Detected':
-            #     self.dUk = self.dU[:self.nU]
-            #     self.dU = ca.vertcat(self.dU, np.zeros((self.nU, 1)))
-            #     self.dU = self.dU[2:]
             
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
@@ -185,25 +186,30 @@ class PINN_MPC():
             xm_2 = ca.vertcat(ymk[-6:-4],umk[-6:-4])
             xm_1 = ca.vertcat(ymk[-4:-2],umk[-4:-2])
             xmk = ca.vertcat(ymk[-2:],umk[-2:])
-            
+            tp1 = time.time()
             ypk, upk = self.sim_mf.pPlanta(ypk, self.dUk)
+            tp2 = time.time()
+            print(f'Tempo Planta: {tp2-tp1}')
             upk = upk.flatten()
             ypk = ypk.flatten()
+            tf1 = time.time()
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
+            tf2 = time.time()
+            print(f'Tempo Modelo F: {tf2-tf1}')
             ymk = np.append(ymk, ymk_next)
             ymk = ymk[2:]
 
-            Ymk.append(ymk[-2:])
-            Ypk.append(ypk)
-            Upk.append(upk)
+            Ymk = np.append(Ymk, ymk[-2:])
+            Ypk = np.append(Ypk, ypk)
+            Upk = np.append(Upk, upk)
             print(dU_opt[:6])
-            YspM.append(self.y_sp[0])
-            YspP.append(self.y_sp[1])
+            YspM = np.append(YspM, self.y_sp[0])
+            YspP = np.append(YspP, self.y_sp[1])
             if i == 5:
                 self.y_sp = np.array([[10], [8]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            
-            print('teste')
+            t2 =  time.time()
+            print(t2-t1)
 
         fig, axes = plt.subplots(2, 2, figsize=(12, 5), sharex=True)
 
