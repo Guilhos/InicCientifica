@@ -46,7 +46,7 @@ class MyModel(nn.Module):
         return desnormalizado
     
     def loss_custom(self, y_true, y_pred, inputs):
-        data_loss =  1e2* torch.mean((y_true[:, 0, 0] - y_pred[:, :, 0]) ** 2) + 1e2*torch.mean((y_true[:, 0, 1] - y_pred[:, :, 1]) ** 2)
+        data_loss =  1e3*torch.mean((y_true[:, 0, 0] - y_pred[:, :, 0]) ** 2) + 1e2*torch.mean((y_true[:, 0, 1] - y_pred[:, :, 1]) ** 2)
         
         return data_loss
 

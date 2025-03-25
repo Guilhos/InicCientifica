@@ -3,7 +3,7 @@ import casadi as ca
 from scipy.optimize import fsolve
 
 class Simulation:
-    def __init__(self,p,m,dt=0.1):
+    def __init__(self,p,m,dt=0.5):
         self.A1 = (2.6)*(10**-3)
         self.Lc = 2
         self.kv = 0.38

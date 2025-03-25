@@ -118,15 +118,14 @@ class PINN_MPC():
         opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dU_init.T @ self.r @ dU_init == 0)  # Restrições de igualdade
 
         opti.solver('ipopt', {
-            "print_level": 0,
-            "tol": 1e-6,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
-            "max_iter": 500,                   # Reduz número de iterações (ajustável)
-            "mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
-            "linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
-            "hessian_approximation": "limited-memory",  # Usa L-BFGS para evitar cálculo de Hessiana
-            "sb": "yes"
+            "ipopt.print_level": 0,
+            "ipopt.tol": 1e-4,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
+            "ipopt.max_iter": 500,                   # Reduz número de iterações (ajustável)
+            "ipopt.mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
+            "ipopt.linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
+            "ipopt.sb": "yes"
         })
-        print(opti.debug)
+        print(opti)
 
         # Criando a função otimizada
         return opti.to_function(
@@ -139,16 +138,11 @@ class PINN_MPC():
         dYk = ypk - ymk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
         dU_init = self.dU
-        tf1 = time.time()
         yModel_init = self.CAMod.pred_function(ymk,umk,dU_init)
-        tf2 = time.time()
-        print(f'Tempo Modelo Pred: {tf2-tf1}')
         Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
-        tnlp1 = time.time()
         x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
-        tnlp2 = time.time()
-        print(f'Tempo NLP: {tnlp2-tnlp1}')
+
         dU_opt = x_opt[:self.nU * self.m]
         #stats = self.opti_nlp.stats()
         #print(stats)
@@ -162,11 +156,11 @@ class PINN_MPC():
 
         self.opti_nlp = self.nlp_func()
 
-        Ypk = np.array([])
-        Upk = np.array([])
-        Ymk = np.array([])
-        YspM = np.array([])
-        YspP = np.array([])
+        Ypk = []
+        Upk = []
+        Ymk = []
+        YspM = []
+        YspP = []
         #Ymink = []
         #Ymaxk = []
 
@@ -186,30 +180,28 @@ class PINN_MPC():
             xm_2 = ca.vertcat(ymk[-6:-4],umk[-6:-4])
             xm_1 = ca.vertcat(ymk[-4:-2],umk[-4:-2])
             xmk = ca.vertcat(ymk[-2:],umk[-2:])
-            tp1 = time.time()
+
             ypk, upk = self.sim_mf.pPlanta(ypk, self.dUk)
-            tp2 = time.time()
-            print(f'Tempo Planta: {tp2-tp1}')
+            
             upk = upk.flatten()
             ypk = ypk.flatten()
-            tf1 = time.time()
+        
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
-            tf2 = time.time()
-            print(f'Tempo Modelo F: {tf2-tf1}')
+            
             ymk = np.append(ymk, ymk_next)
             ymk = ymk[2:]
 
-            Ymk = np.append(Ymk, ymk[-2:])
-            Ypk = np.append(Ypk, ypk)
-            Upk = np.append(Upk, upk)
+            Ymk.append(ymk[-2:])
+            Ypk.append(ypk)
+            Upk.append(upk)
             print(dU_opt[:6])
-            YspM = np.append(YspM, self.y_sp[0])
-            YspP = np.append(YspP, self.y_sp[1])
+            YspM.append(self.y_sp[0])
+            YspP.append(self.y_sp[1])
             if i == 5:
                 self.y_sp = np.array([[10], [8]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             t2 =  time.time()
-            print(t2-t1)
+            print(f'Tempo decorrido: {t2-t1}')
 
         fig, axes = plt.subplots(2, 2, figsize=(12, 5), sharex=True)
 
@@ -235,8 +227,12 @@ class PINN_MPC():
         
         axes[1][0].plot(x, np.array(Upk)[:,0], label="resP", color="green")
         axes[1][0].set_title("Alpha")
+        axes[1][0].legend()
+        axes[1][0].grid()
         axes[1][1].plot(x, np.array(Upk)[:,1], label="resP", color="green")
         axes[1][1].set_title("Velocidade de rotacao")
+        axes[1][1].legend()
+        axes[1][1].grid()
 
         plt.xlabel("Tempo")
         plt.suptitle("Comparação de resM e resP")
