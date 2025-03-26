@@ -98,9 +98,6 @@ class PINN_MPC():
         dYk = yPlantak - yModelk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
 
-        # Conversão de constantes para CasADi MX
-        dU_init = ca.DM(self.dU)
-
         # Predição do modelo
         yModel_pred = self.CAMod.pred_function(yModelk, uModelk, dUs)
         
@@ -115,7 +112,7 @@ class PINN_MPC():
         # lbg e ubg
         opti.subject_to(opti.bounded(self.y_min, yModel_pred, self.y_max))
         opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs, self.u_max))
-        opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dU_init.T @ self.r @ dU_init == 0)  # Restrições de igualdade
+        opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dUs.T @ self.r @ dUs == 0)  # Restrições de igualdade
 
         opti.solver('ipopt', {
             "ipopt.print_level": 0,
@@ -161,6 +158,7 @@ class PINN_MPC():
         Ymk = []
         YspM = []
         YspP = []
+        Tempos = []
         #Ymink = []
         #Ymaxk = []
 
@@ -201,6 +199,7 @@ class PINN_MPC():
                 self.y_sp = np.array([[10], [8]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             t2 =  time.time()
+            Tempos.append(t2-t1)
             print(f'Tempo decorrido: {t2-t1}')
 
         fig, axes = plt.subplots(2, 2, figsize=(12, 5), sharex=True)
@@ -244,7 +243,7 @@ class PINN_MPC():
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 12, 3, [1/12.5653085708618164062**2,7.6e-5/9.30146217346191406250**2], [1/0.15**2, 1e3/5000**2], 3
+    p, m, q, r, steps = 12, 3, [1/12.5653085708618164062**2,10/9.30146217346191406250**2], [0.1/0.15**2, 0.5/5000**2], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
