@@ -164,7 +164,7 @@ class PINN_MPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 50
+        iter = 30
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
@@ -244,7 +244,7 @@ class PINN_MPC():
         return dU_opt
 
 if __name__ == '__main__':
-    p, m, q, r, steps = 50, 3, [8/100,1/100], [1/0.15**2, 1000/5000**2], 3
+    p, m, q, r, steps = 12, 3, [1/12.5653085708618164062**2,7.6e-5/9.30146217346191406250**2], [1/0.15**2, 1e3/5000**2], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
