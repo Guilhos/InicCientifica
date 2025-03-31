@@ -59,7 +59,7 @@ class Simulation:
 
         for j in range(self.p):
             if j < self.m:
-                params = [self.alphas[j], self.N_RotS[j]]
+                params = [self.alphas[j-1], self.N_RotS[j-1]]
             sol = F(x0=[init_m, init_p], p=params)
             xf_values = np.array(sol["xf"])
             aux1, aux2 = xf_values

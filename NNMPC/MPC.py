@@ -170,14 +170,14 @@ class PINN_MPC():
             #print(stats)
             self.dUk = dU_opt[:self.nU]
             self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
-            self.dU = self.dU[2:]
+            self.dU = self.dU[self.nU:]
             
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
             
-            xm_2 = ca.vertcat(ymk[-6:-4],umk[-6:-4])
-            xm_1 = ca.vertcat(ymk[-4:-2],umk[-4:-2])
-            xmk = ca.vertcat(ymk[-2:],umk[-2:])
+            xm_2 = ca.vertcat(ymk[-self.nY*3:-self.nY*2],umk[-self.nU*3:-self.nU*2])
+            xm_1 = ca.vertcat(ymk[-self.nY*2:-self.nY],umk[-self.nU*2:-self.nU])
+            xmk = ca.vertcat(ymk[-self.nY:],umk[-self.nU:])
 
             ypk, upk = self.sim_mf.pPlanta(ypk, self.dUk)
             
@@ -187,12 +187,12 @@ class PINN_MPC():
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
             
             ymk = np.append(ymk, ymk_next)
-            ymk = ymk[2:]
+            ymk = ymk[self.nY:]
 
-            Ymk.append(ymk[-2:])
+            Ymk.append(ymk[-self.nY:])
             Ypk.append(ypk)
             Upk.append(upk)
-            print(dU_opt[:6])
+            print(dU_opt[:self.m*self.nU])
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
             if i == 5:
@@ -262,13 +262,13 @@ class PINN_MPC():
 
 if __name__ == '__main__':
 
-    qVazao = 8/12.5653085708618164062**2
-    qPressao = 10/9.30146217346191406250**2
-    rAlpha = 0.001/0.15**2
-    rN = 0.01/5000**2
+    qVazao = 150/12.5653085708618164062**2
+    qPressao = 85/9.30146217346191406250**2
+    rAlpha = 0.00025/0.15**2
+    rN = 1/5000**2
 
 
-    p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
+    p, m, q, r, steps = 12, 5, [qVazao,qPressao], [rAlpha, rN], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)

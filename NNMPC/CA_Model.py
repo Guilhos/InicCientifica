@@ -122,15 +122,15 @@ class CA_Model:
         
         return ca.Function('CA_Model', x_seq, [output])
 
-    def build_model_mpc(self,p,m,ny,nu,steps):
+    def build_model_mpc(self,p,m,nY,nU,steps):
 
-        y_k1 = ca.MX.sym('y_k', ny*steps, 1) # Sequência de entrada simbólica
+        y_k1 = ca.MX.sym('y_k', nY*steps, 1) # Sequência de entrada simbólica
         y_k = y_k1
 
-        u_k1 = ca.MX.sym('u_k', nu*steps, 1)  # Sequência de entrada simbólica
+        u_k1 = ca.MX.sym('u_k', nU*steps, 1)  # Sequência de entrada simbólica
         u_k = u_k1
 
-        du_k = ca.MX.sym('du_k', nu*m, 1) # Sequência de entrada simbólica
+        du_k = ca.MX.sym('du_k', nU*m, 1) # Sequência de entrada simbólica
 
         x_min_mx = ca.MX(self.x_min)
         x_max_mx = ca.MX(self.x_max)
@@ -138,14 +138,14 @@ class CA_Model:
         for j in range (p):
             if j < m:
                 u_k_new = u_k
-                u_k_new = ca.vertcat(u_k_new, u_k_new[-2:])
-                u_k_new = u_k_new[2:]
-                u_k_new[-2:] = u_k_new[-2:] + du_k[nu*j:nu*j+2]
+                u_k_new = ca.vertcat(u_k_new, u_k_new[-nU:])
+                u_k_new = u_k_new[nU:]
+                u_k_new[-nU:] = u_k_new[-nU:] + du_k[nU*j:nU*j+2]
                 u_k = u_k_new
 
-            x_seq = [ca.vertcat(y_k[-ny*steps],y_k[-ny*steps+1],u_k[-nu*steps],u_k[-nu*steps+1]),
-                    ca.vertcat(y_k[-ny*(steps-1)],y_k[-ny*(steps-1)+1],u_k[-nu*(steps-1)],u_k[-nu*(steps-1)+1]),
-                    ca.vertcat(y_k[-ny*(steps-2)],y_k[-ny*(steps-2)+1],u_k[-nu*(steps-2)],u_k[-nu*(steps-2)+1])]
+            x_seq = [ca.vertcat(y_k[-nY*steps],y_k[-nY*steps+1],u_k[-nU*steps],u_k[-nU*steps+1]),
+                    ca.vertcat(y_k[-nY*(steps-1)],y_k[-nY*(steps-1)+1],u_k[-nU*(steps-1)],u_k[-nU*(steps-1)+1]),
+                    ca.vertcat(y_k[-nY*(steps-2)],y_k[-nY*(steps-2)+1],u_k[-nU*(steps-2)],u_k[-nU*(steps-2)+1])]
             
             x_seq_norm = [(2 * (x - x_min_mx) / (x_max_mx - x_min_mx) - 1) for x in x_seq]
 
@@ -159,11 +159,11 @@ class CA_Model:
                 params[2][0], params[2][1], 'none'
             )
 
-            output = ((output + 1) / 2) * (x_max_mx[:2] - x_min_mx[:2]) + x_min_mx[:2]
+            output = ((output + 1) / 2) * (x_max_mx[:nY] - x_min_mx[:nY]) + x_min_mx[:nY]
 
             y_k = ca.vertcat(y_k, output)
 
-        y_k = y_k[6:]
+        y_k = y_k[steps*nY:]
 
         return ca.Function('CA_Model_MPC', [y_k1, u_k1, du_k], [y_k])
 
