@@ -113,18 +113,25 @@ class Simulation:
         self.uk = np.array(self.u).reshape(-1,1)[-2:]
         print(self.uk)
         return self.y, self.uk
-        
+    
+    def ySetPoint(self, nSP):
+        SPlist = []
+        for i in range(nSP):
+            result = fsolve(self.fun, (10, 10), args=(np.random.randint(35,65)/100,np.random.randint(27e3,5e4),self.lut))
+            SPlist.append(result)
+        return SPlist
 
 
 if __name__ == '__main__':
 
     dU = [0,0,0,0,0,0]
-    sim = Simulation(1,1)
+    sim = Simulation(1,1,3)
     y0, u0 = sim.pIniciais()
-    print(y0.shape, y0, u0)
 
     yPlanta = sim.pPlanta(y0, dU)
-    print(yPlanta)
+    
+    SPlist = sim.ySetPoint(3)
+    print(SPlist)
 
 
 
