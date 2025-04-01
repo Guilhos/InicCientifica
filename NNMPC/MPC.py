@@ -22,8 +22,8 @@ class PINN_MPC():
         #self.dU = np.concatenate((np.array(self.dU), np.zeros((self.nU * (p-m), 1))))
 
         # Objetos
-        self.sim_pred = Simulation(p,m)
-        self.sim_mf = Simulation(1,1)
+        self.sim_pred = Simulation(p,m,steps)
+        self.sim_mf = Simulation(1,1,steps)
         self.CAMod = CA_Model("NNMPC/libs/modelo_treinado.pth",p,m,self.nY,self.nU,self.steps)
         self.NNMod_mf = NN_Model(1,1)
 
@@ -66,8 +66,8 @@ class PINN_MPC():
         self.y_min = ca.DM(self.iTil(self.y_min,self.p)) # Expansão do y_min para P. SHAPE -> (nY*P, 1)
         self.y_max = ca.DM(self.iTil(self.y_max,self.p)) # Expansão do y_max para P. SHAPE -> (nY*P, 1)
 
-        self.u_min = ca.DM(self.iTil(self.u_min,self.steps)) # Expansão do u_min para M. SHAPE -> (nU*M, 1)
-        self.u_max = ca.DM(self.iTil(self.u_max,self.steps)) # Expansão do u_max para M. SHAPE -> (nU*M, 1)
+        self.u_min = ca.DM(self.iTil(self.u_min,self.m)) # Expansão do u_min para M. SHAPE -> (nU*M, 1)
+        self.u_max = ca.DM(self.iTil(self.u_max,self.m)) # Expansão do u_max para M. SHAPE -> (nU*M, 1)
 
         self.dU_min = self.iTil(self.dU_min, self.m) # Expansão do dU_min para M. SHAPE -> (nU*M, 1)
         #self.dU_min = ca.DM(np.concatenate((self.dU_min,np.zeros((int(self.nU) * (self.p - self.m), 1))))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
@@ -102,7 +102,7 @@ class PINN_MPC():
         yModel_pred = self.CAMod.pred_function(yModelk, uModelk, dUs)
         
         # Matriz triangular para os controles
-        matriz_inferior = self.matriz_triangular_identidade(self.steps, self.steps, self.nU)
+        matriz_inferior = self.matriz_triangular_identidade(self.m, self.m, self.nU)
 
         # Restrições
         # x_min e x_max
@@ -111,7 +111,7 @@ class PINN_MPC():
 
         # lbg e ubg
         opti.subject_to(opti.bounded(self.y_min, yModel_pred, self.y_max))
-        opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.steps, 1) + matriz_inferior @ dUs, self.u_max))
+        opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.m, 1) + matriz_inferior @ dUs, self.u_max))
         opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dUs.T @ self.r @ dUs == 0)  # Restrições de igualdade
 
         opti.solver('ipopt', {
@@ -162,7 +162,7 @@ class PINN_MPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 55
+        iter = 65
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
@@ -196,11 +196,14 @@ class PINN_MPC():
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
             if i == 5:
-                self.y_sp = np.array([[10], [7.9]])
+                self.y_sp = np.array([[10], [8.15]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            # elif i == 30:
-            #     self.y_sp = np.array([[5.1], [6]])
-            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            elif i == 25:
+                self.y_sp = np.array([[7.74555396], [6.66187275]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            elif i == 45:
+                self.y_sp = np.array([[6], [6]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             t2 =  time.time()
             Tempos.append(t2-t1)
             print(f'Tempo decorrido: {t2-t1}')
@@ -225,11 +228,11 @@ class PINN_MPC():
         axes[0][1].plot(x, np.array(Ypk)[:,1], label="plantaM", color="blue")
         axes[0][1].plot(x, YspP.squeeze(), linestyle="--", color="red", label="y_sp")
         axes[0][1].plot([0,iter], [5.27,5.27], linestyle="--", color="black")
-        axes[0][1].plot([0,iter], [10.33,10.33], linestyle="--", color="black")
+        axes[0][1].plot([0,iter], [9.3,9.3], linestyle="--", color="black")
         axes[0][1].set_title("Pressão")
         axes[0][1].legend()
         axes[0][1].grid()
-        axes[0][1].set_ylim(4.77,10.83)
+        axes[0][1].set_ylim(4.77,9.83)
         
         axes[1][0].plot(x, np.array(Upk)[:,0], label="Alpha", color="green")
         axes[1][0].plot([0,iter], [0.35,0.35], linestyle="--", color="black")
@@ -262,13 +265,13 @@ class PINN_MPC():
 
 if __name__ == '__main__':
 
-    qVazao = 150/12.5653085708618164062**2
-    qPressao = 85/9.30146217346191406250**2
-    rAlpha = 0.00025/0.15**2
-    rN = 1/5000**2
+    qVazao = 1/12.5653085708618164062**2
+    qPressao = 1e-4/9.30146217346191406250**2
+    rAlpha = 1e-4/0.15**2
+    rN = 1e-3/5000**2
 
 
-    p, m, q, r, steps = 12, 5, [qVazao,qPressao], [rAlpha, rN], 3
+    p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
     mpc = PINN_MPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)

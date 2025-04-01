@@ -3,20 +3,21 @@ import casadi as ca
 from scipy.optimize import fsolve
 
 class Simulation:
-    def __init__(self,p,m,dt=0.5):
+    def __init__(self,p,m,steps,dt=0.5):
         self.A1 = (2.6)*(10**-3)
         self.Lc = 2
         self.kv = 0.38
         self.P1 = 4.5
         self.P_out = 5
         self.C = 479
-        self.alphas = [0.5,0.5,0.5]
-        self.N_RotS = [38500,38500,38500]
+        self.alphas = [0.5]*m
+        self.N_RotS = [38500]*m
         self.dt = dt
         self.y = []
         self.u = []
         self.p = p
         self.m = m
+        self.steps = steps
 
         try:
             # Tentando importar de libs.Interpolation
@@ -69,8 +70,8 @@ class Simulation:
             if j < self.m:
                 self.u.append([self.alphas[j], self.N_RotS[j]])
         
-        y0 = np.array(self.y[:self.m]).reshape(-1,1)
-        u0 = np.array(self.u[:self.m]).reshape(-1,1)
+        y0 = np.array(self.y[:self.steps]).reshape(-1,1)
+        u0 = np.array(self.u[:self.steps]).reshape(-1,1)
         
         return (y0, u0)
     
