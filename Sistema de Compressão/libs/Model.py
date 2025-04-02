@@ -1,4 +1,5 @@
 import time
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -33,16 +34,23 @@ class MyModel(nn.Module):
             nn.Tanh(),
             nn.Linear(32, 2),
                 )
+        
+        # Pesos adaptativos iniciais
+        self.log_weight_uq = nn.Parameter(torch.tensor(np.log(10)))  # Peso inicial 10.0
+        self.log_weight_f = nn.Parameter(torch.tensor(np.log(10)))  # Peso inicial 10.0
 
 
     def forward(self, inputs):
         # Passagem pelas camadas RNN
         rnn_input = 2 * (inputs - self.x_min) / (self.x_max - self.x_min) - 1
+
         rnn_output, _ = self.rnn_layer(rnn_input)
 
         dense_output = self.dense_layers(rnn_output[:, -1, :])  # Dimensão [batch_size, hidden_size * num_directions]
+
         desnormalizado = ((dense_output + 1) / 2) * (self.x_max[:, :, :2] - self.x_min[:, :, :2]) + self.x_min[:, :, :2]
           #Pegando apenas a última saída da sequência
+
         return desnormalizado
     
     def loss_custom(self, y_true, y_pred, inputs):
@@ -50,25 +58,125 @@ class MyModel(nn.Module):
         
         return data_loss
 
-    def train_model(self, model, train_loader, lr, epochs, optimizers):
-        optimizer = optimizers(model.parameters(), lr=lr)
-        model.train()
-        
+    def train_model(self, train_loader, val_loader, lr, epochs, patience, factor):
+        optimizer = torch.optim.Adam(
+            [
+                {"params": self.parameters()},  # Inclui pesos adaptativos
+            ],
+            lr=lr,
+        )
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", factor=factor, patience=patience, verbose=True
+        )
+
+        train_loss_values, val_loss_values = [], []
+        phys_loss_values, data_loss_values = [], []
+        weights_uq, weights_f = [], []
+
         for epoch in range(epochs):
-            total_loss = 0
+            self.train()
+            total_loss, total_phys_loss, total_data_loss = 0, 0, 0
+
             for inputs, y_true in train_loader:
                 optimizer.zero_grad()
-                
-                y_pred = model(inputs)
-                loss = self.loss_custom(y_true, y_pred, inputs)
+
+                y_pred = self(inputs)
+
+                interp = []
+                for i in range(inputs.shape[0]):
+                    aux = self.interpolation([(inputs[i, -1, -1]).item(), (y_true[i, 0, 0]).item()])
+                    interp.append(aux)
+                interp = np.array(interp)
+                interp = torch.tensor(interp, dtype=torch.float32)
+
+                # Cálculo das perdas físicas
+                m_t = (
+                    11 * y_pred[:, :, 0]
+                    - 18 * inputs[:, -2, 0]
+                    + 9 * inputs[:, -3, 0]
+                    - 2 * inputs[:, 0, 0]
+                ) / (6 * self.dt)
+                p_t = (
+                    11 * y_pred[:, :, 1]
+                    - 18 * inputs[:, -2, 1]
+                    + 9 * inputs[:, -3, 1]
+                    - 2 * inputs[:, 0, 1]
+                ) / (6 * self.dt)
+                fLoss_mass = torch.mean(
+                    torch.square(
+                        m_t
+                        - (self.A1 / self.Lc) * ((interp * self.P1) - y_true[:, :, 1])
+                        * 1e3
+                    )
+                )
+                press_l = ((self.C**2) / 2) * (
+                    y_true[:, :, 0]
+                    - inputs[:, -1, -2]
+                    * self.kv
+                    * (
+                        torch.sqrt(y_true[:, :, 1] * 1e3 - self.P_out * 1e3)
+                    ).clamp(min=0)
+                )
+                fLoss_pres = torch.mean(torch.square(p_t - press_l * 1e-11))
+                phys_loss = (fLoss_mass + fLoss_pres)*1e-2
+
+                # Cálculo das perdas de dados
+                data_loss = (
+                    torch.mean(1e1 * (y_true[:, 0, 0] - y_pred[:, :, 0]) ** 2)
+                    + 1e2 * torch.mean((y_true[:, 0, 1] - y_pred[:, :, 1]) ** 2)
+                )
+
+                # Perda total com pesos adaptativos
+                loss = (
+                    0.5 * torch.exp(-self.log_weight_f.clamp(min=-1)) * phys_loss
+                    + 0.5 * torch.exp(-self.log_weight_uq.clamp(min=-1)) * data_loss
+                    + self.log_weight_f.clamp(min=0)
+                    + self.log_weight_uq.clamp(min=0)
+                )
+
                 loss.backward()
                 optimizer.step()
-                
-                total_loss += loss.item()
 
-            average_loss = total_loss / len(train_loader)
-            self.loss_history.append(average_loss)
-            print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss / len(train_loader)}")
+                total_loss += loss.item()
+                total_phys_loss += phys_loss.item()
+                total_data_loss += data_loss.item()
+
+            # Atualizar scheduler
+            scheduler.step(total_loss / len(train_loader))
+
+            # Registrar valores dos pesos
+            weights_uq.append(torch.exp(self.log_weight_uq).item())
+            weights_f.append(torch.exp(self.log_weight_f).item())
+
+            train_loss_values.append(total_loss / len(train_loader))
+            phys_loss_values.append(total_phys_loss / len(train_loader))
+            data_loss_values.append(total_data_loss / len(train_loader))
+
+            # Validação
+            self.eval()
+            val_loss = 0
+            with torch.no_grad():
+                for val_inputs, val_y_true in val_loader:
+                    val_y_pred = self(val_inputs)
+                    val_loss += (
+                        torch.mean(
+                            (val_y_true[:, 0, 0] - val_y_pred[:, :, 0]) ** 2
+                        ).item()
+                        + torch.mean(
+                            (val_y_true[:, 0, 1] - val_y_pred[:, :, 1]) ** 2
+                        ).item()
+                    )
+
+                val_loss /= len(val_loader)
+                val_loss_values.append(val_loss)
+
+            print(
+                f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss_values[-1]:.6f}, "
+                f"Val Loss: {val_loss_values[-1]:.6f}, "
+                f"Weights: uq={weights_uq[-1]:.6f}, f={weights_f[-1]:.6f}"
+            )
+
+        return train_loss_values, val_loss_values, phys_loss_values, data_loss_values, weights_uq, weights_f
             
     def test_model(self, x_test, interval, model):
         model.eval()

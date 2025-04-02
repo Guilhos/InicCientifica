@@ -8,6 +8,7 @@ class CA_Model:
     def __init__(self, modelpath, p, m, nY, nU, steps):
         # Carregar os pesos do modelo salvos
         model_path = modelpath
+        H = 60
         state_dict = torch.load(model_path)
         
         Wi = state_dict['rnn_layer.weight_ih_l0'][:].numpy()
@@ -16,28 +17,28 @@ class CA_Model:
         Bh = state_dict['rnn_layer.bias_hh_l0'][:].numpy()
         print(Wi.shape, Wh.shape, Bi.shape, Bh.shape)
         
-        Wii = ca.DM(Wi[:60])
-        Wif = ca.DM(Wi[60:120])
-        Wig = ca.DM(Wi[120:180])
-        Wio = ca.DM(Wi[180:240])
+        Wii = ca.DM(Wi[:H])
+        Wif = ca.DM(Wi[H:2*H])
+        Wig = ca.DM(Wi[2*H:3*H])
+        Wio = ca.DM(Wi[3*H:4*H])
         Wi = [Wii,Wif,Wig,Wio]
         
-        Whi = ca.DM(Wh[:60])
-        Whf = ca.DM(Wh[60:120])
-        Whg = ca.DM(Wh[120:180])
-        Who = ca.DM(Wh[180:240])
+        Whi = ca.DM(Wh[:H])
+        Whf = ca.DM(Wh[H:2*H])
+        Whg = ca.DM(Wh[2*H:3*H])
+        Who = ca.DM(Wh[3*H:4*H])
         Wh = [Whi, Whf, Whg, Who]
         
-        Bii = ca.DM(Bi[:60].reshape(-1, 1))
-        Bif = ca.DM(Bi[60:120].reshape(-1, 1))
-        Big = ca.DM(Bi[120:180].reshape(-1, 1))
-        Bio = ca.DM(Bi[180:240].reshape(-1, 1))
+        Bii = ca.DM(Bi[:H].reshape(-1, 1))
+        Bif = ca.DM(Bi[H:2*H].reshape(-1, 1))
+        Big = ca.DM(Bi[2*H:3*H].reshape(-1, 1))
+        Bio = ca.DM(Bi[3*H:4*H].reshape(-1, 1))
         Bi = [Bii,Bif,Big,Bio]
         
-        Bhi = ca.DM(Bh[:60].reshape(-1, 1))
-        Bhf = ca.DM(Bh[60:120].reshape(-1, 1))
-        Bhg = ca.DM(Bh[120:180].reshape(-1, 1))
-        Bho = ca.DM(Bh[180:240].reshape(-1, 1))
+        Bhi = ca.DM(Bh[:H].reshape(-1, 1))
+        Bhf = ca.DM(Bh[H:2*H].reshape(-1, 1))
+        Bhg = ca.DM(Bh[2*H:3*H].reshape(-1, 1))
+        Bho = ca.DM(Bh[3*H:4*H].reshape(-1, 1))
         Bh = [Bhi,Bhf,Bhg,Bho]
         
         LSTM = [Wi,Wh,Bi,Bh]
