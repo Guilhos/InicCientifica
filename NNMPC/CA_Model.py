@@ -8,7 +8,7 @@ class CA_Model:
     def __init__(self, modelpath, p, m, nY, nU, steps):
         # Carregar os pesos do modelo salvos
         model_path = modelpath
-        H = 60
+        self.H = 128
         state_dict = torch.load(model_path)
         
         Wi = state_dict['rnn_layer.weight_ih_l0'][:].numpy()
@@ -17,28 +17,28 @@ class CA_Model:
         Bh = state_dict['rnn_layer.bias_hh_l0'][:].numpy()
         print(Wi.shape, Wh.shape, Bi.shape, Bh.shape)
         
-        Wii = ca.DM(Wi[:H])
-        Wif = ca.DM(Wi[H:2*H])
-        Wig = ca.DM(Wi[2*H:3*H])
-        Wio = ca.DM(Wi[3*H:4*H])
+        Wii = ca.DM(Wi[:self.H])
+        Wif = ca.DM(Wi[self.H:2*self.H])
+        Wig = ca.DM(Wi[2*self.H:3*self.H])
+        Wio = ca.DM(Wi[3*self.H:4*self.H])
         Wi = [Wii,Wif,Wig,Wio]
         
-        Whi = ca.DM(Wh[:H])
-        Whf = ca.DM(Wh[H:2*H])
-        Whg = ca.DM(Wh[2*H:3*H])
-        Who = ca.DM(Wh[3*H:4*H])
+        Whi = ca.DM(Wh[:self.H])
+        Whf = ca.DM(Wh[self.H:2*self.H])
+        Whg = ca.DM(Wh[2*self.H:3*self.H])
+        Who = ca.DM(Wh[3*self.H:4*self.H])
         Wh = [Whi, Whf, Whg, Who]
         
-        Bii = ca.DM(Bi[:H].reshape(-1, 1))
-        Bif = ca.DM(Bi[H:2*H].reshape(-1, 1))
-        Big = ca.DM(Bi[2*H:3*H].reshape(-1, 1))
-        Bio = ca.DM(Bi[3*H:4*H].reshape(-1, 1))
+        Bii = ca.DM(Bi[:self.H].reshape(-1, 1))
+        Bif = ca.DM(Bi[self.H:2*self.H].reshape(-1, 1))
+        Big = ca.DM(Bi[2*self.H:3*self.H].reshape(-1, 1))
+        Bio = ca.DM(Bi[3*self.H:4*self.H].reshape(-1, 1))
         Bi = [Bii,Bif,Big,Bio]
         
-        Bhi = ca.DM(Bh[:H].reshape(-1, 1))
-        Bhf = ca.DM(Bh[H:2*H].reshape(-1, 1))
-        Bhg = ca.DM(Bh[2*H:3*H].reshape(-1, 1))
-        Bho = ca.DM(Bh[3*H:4*H].reshape(-1, 1))
+        Bhi = ca.DM(Bh[:self.H].reshape(-1, 1))
+        Bhf = ca.DM(Bh[self.H:2*self.H].reshape(-1, 1))
+        Bhg = ca.DM(Bh[2*self.H:3*self.H].reshape(-1, 1))
+        Bho = ca.DM(Bh[3*self.H:4*self.H].reshape(-1, 1))
         Bh = [Bhi,Bhf,Bhg,Bho]
         
         LSTM = [Wi,Wh,Bi,Bh]
@@ -113,7 +113,7 @@ class CA_Model:
         
         output = self.dense_layer(
             self.dense_layer(
-                self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(60, 1), ca.DM.zeros(60, 1)),
+                self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(self.H, 1), ca.DM.zeros(self.H, 1)),
                 params[1][0], params[1][1],'tanh'
             ),
             params[2][0], params[2][1],'none'
@@ -154,7 +154,7 @@ class CA_Model:
             
             output = self.dense_layer(
                 self.dense_layer(
-                    self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(60, 1), ca.DM.zeros(60, 1)),
+                    self.lstm_layer(x_seq_norm, params[0][0], params[0][1], params[0][2], params[0][3], ca.DM.zeros(self.H, 1), ca.DM.zeros(self.H, 1)),
                     params[1][0], params[1][1],'tanh'
                 ),
                 params[2][0], params[2][1], 'none'

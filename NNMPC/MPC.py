@@ -190,9 +190,6 @@ class PINN_MPC():
             upk = upk.flatten()
             ypk = ypk.flatten()
             
-        
-            
-            
             ymk = np.append(ymk, ymk_next)
             ymk = ymk[self.nY:]
 
@@ -205,12 +202,12 @@ class PINN_MPC():
             if i == 5:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            # elif i == 25:
-            #     self.y_sp = np.array([[8.39637471], [6.4025308]])
-            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            # elif i == 45:
-            #     self.y_sp = np.array([[5.67905178], [5.85870524]])
-            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            elif i == 25:
+                self.y_sp = np.array([[8.39637471], [6.4025308]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            elif i == 45:
+                self.y_sp = np.array([[5.67905178], [5.85870524]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))
