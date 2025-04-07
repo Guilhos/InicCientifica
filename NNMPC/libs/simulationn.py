@@ -75,14 +75,21 @@ class Simulation:
         
         return (y0, u0)
     
-    def pPlanta(self, y0, dU):
+    def pPlanta(self, y0, dU, caller = None):
         self.y = []
-        self.alphas.append(self.alphas[-1] + float(dU[0]))
+        if type(caller).__name__ == "Only_NMPC":
+            self.alphas.append(self.alphas[-1] + dU[0])
+            self.N_RotS.append(self.N_RotS[-1] + dU[1])
+            init_m = y0[-2]
+            init_p = y0[-1]
+        else:
+            self.alphas.append(self.alphas[-1] + float(dU[0]))
+            self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
+            init_m = y0[-2].item()
+            init_p = y0[-1].item()
         self.alphas = self.alphas[1:]
-        self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
         self.N_RotS = self.N_RotS[1:]
-        init_m = y0[-2].item()
-        init_p = y0[-1].item()
+        
 
          # Variáveis CasADi
         x = ca.MX.sym('x', 2)
@@ -100,7 +107,7 @@ class Simulation:
         for j in range(self.p):
             if j < self.m:
                 params = [self.alphas[j-1], self.N_RotS[j-1]]
-            sol = F(x0=[init_m, init_p], p=params)
+            sol = F(x0 = [init_m, init_p], p=params)
             xf_values = np.array(sol["xf"])
             aux1, aux2 = xf_values
             init_m = aux1[-1]

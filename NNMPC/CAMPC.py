@@ -3,10 +3,8 @@ import matplotlib.pyplot as plt
 import casadi as ca
 import time
 from libs.simulationn import Simulation
-from NN_Model import NN_Model
-from CA_Model import CA_Model
 
-class PINN_MPC():
+class Only_NMPC():
     def __init__(self, p, m, q, r, steps):
         #Constantes
         self.p = p
@@ -24,8 +22,6 @@ class PINN_MPC():
         # Objetos
         self.sim_pred = Simulation(p,m,steps)
         self.sim_mf = Simulation(1,1,steps)
-        self.CAMod = CA_Model("NNMPC/libs/modelo_treinado.pth",p,m,self.nY,self.nU,self.steps)
-        self.NNMod_mf = NN_Model(1,1)
 
         # Limites das variáveis
         self.u_min = np.array([[0.35], [27e3]])
@@ -99,7 +95,7 @@ class PINN_MPC():
         dYk = ca.repmat(dYk, self.p, 1)
 
         # Predição do modelo
-        yModel_pred = self.CAMod.pred_function(yModelk, uModelk, dUs)
+        yModel_pred = self.sim_pred.pPlanta(yModelk, dUs, caller=self)
         
         # Matriz triangular para os controles
         matriz_inferior = self.matriz_triangular_identidade(self.m, self.m, self.nU)
@@ -135,8 +131,7 @@ class PINN_MPC():
         dYk = ypk - ymk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
         dU_init = self.dU
-        yModel_init = self.CAMod.pred_function(ymk,umk,dU_init)
-        Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
+        Fs_init = (ypk - self.y_sp + dYk).T @ self.q @ (ypk - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
         x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
 
@@ -162,7 +157,7 @@ class PINN_MPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 65
+        iter = 300
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
@@ -174,12 +169,8 @@ class PINN_MPC():
             
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
-            
-            xm_2 = ca.vertcat(ymk[-self.nY*3:-self.nY*2],umk[-self.nU*3:-self.nU*2])
-            xm_1 = ca.vertcat(ymk[-self.nY*2:-self.nY],umk[-self.nU*2:-self.nU])
-            xmk = ca.vertcat(ymk[-self.nY:],umk[-self.nU:])
 
-            ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
+            ymk, _ = self.sim_mf.pPlanta(ymk, self.dUk)
             
             t2 =  time.time()
             Tempos.append(t2-t1)
@@ -199,13 +190,13 @@ class PINN_MPC():
             print(dU_opt[:self.m*self.nU])
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
-            if i == 5:
+            if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 25:
+            elif i == 100:
                 self.y_sp = np.array([[8.39637471], [6.4025308]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 45:
+            elif i == 200:
                 self.y_sp = np.array([[5.67905178], [5.85870524]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             
@@ -251,7 +242,7 @@ class PINN_MPC():
         axes[1][1].plot(x/2, np.array(Upk)[:,1], label="N", color="green")
         axes[1][1].plot([0,iter/2], [27e3,27e3], linestyle="--", color="black")
         axes[1][1].plot([0,iter/2], [5e4,5e4], linestyle="--", color="black")
-        axes[1][1].set_title("Velocidade de rotacao")
+        axes[1][1].set_title("Velocidade de rotacao x Tempo")
         axes[1][1].set_ylabel("N / hz")
         axes[1][1].set_xlabel("Tempo / s")
         axes[1][1].legend()
@@ -286,6 +277,6 @@ if __name__ == '__main__':
 
 
     p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
-    mpc = PINN_MPC(p, m, q, r, steps)
+    mpc = Only_NMPC(p, m, q, r, steps)
     dU_opt = mpc.run()
     print("Controle ótimo:", dU_opt, dU_opt.shape)
