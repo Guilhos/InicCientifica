@@ -8,7 +8,7 @@ class CA_Model:
     def __init__(self, modelpath, p, m, nY, nU, steps):
         # Carregar os pesos do modelo salvos
         model_path = modelpath
-        self.H = 128
+        self.H = 60
         state_dict = torch.load(model_path)
         
         Wi = state_dict['rnn_layer.weight_ih_l0'][:].numpy()
