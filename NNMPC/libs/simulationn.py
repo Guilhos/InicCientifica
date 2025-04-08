@@ -3,7 +3,7 @@ import casadi as ca
 from scipy.optimize import fsolve
 
 class Simulation:
-    def __init__(self,p,m,steps,dt=0.5):
+    def __init__(self,p,m,steps,dt=0.5, caller = None):
         self.A1 = (2.6)*(10**-3)
         self.Lc = 2
         self.kv = 0.38
@@ -32,6 +32,7 @@ class Simulation:
         interp = Interpolation('NNMPC/libs/tabela_phi.csv')
         interp.load_data()
         self.lut = interp.interpolate()
+        #if type(caller).__name__ == "Only_NMPC":
         self.ca_PredFun = self.ca_Pred_Function()      
 
     def fun(self, variables, alpha, N, lut):
@@ -78,12 +79,14 @@ class Simulation:
     
     def pPlanta(self, y0, dU, caller = None):
         self.y = []
-        self.alphas.append(self.alphas[-1] + float(dU[0]))
-        self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
+        alphas = self.alphas
+        N_RotS = self.N_RotS
+        alphas.append(alphas[-1] + float(dU[0]))
+        N_RotS.append(N_RotS[-1] + float(dU[1]))
         init_m = y0[-2].item()
         init_p = y0[-1].item()
-        self.alphas = self.alphas[1:]
-        self.N_RotS = self.N_RotS[1:]
+        alphas = alphas[1:]
+        N_RotS = N_RotS[1:]
         
 
          # Variáveis CasADi
@@ -101,15 +104,15 @@ class Simulation:
 
         for j in range(self.p):
             if j < self.m:
-                params = [self.alphas[j-1], self.N_RotS[j-1]]
-            sol = F(x0 = [init_m, init_p], p=params)
+                params = [alphas[j-1], N_RotS[j-1]]
+            sol = F(x0 = [init_m, init_p], p = params)
             xf_values = np.array(sol["xf"])
             aux1, aux2 = xf_values
             init_m = aux1[-1]
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
             if j < self.m:
-                self.u.append([self.alphas[j], self.N_RotS[j]])
+                self.u.append([alphas[j], N_RotS[j]])
 
         self.y = np.array(self.y).reshape(-1,1)
         self.uk = np.array(self.u).reshape(-1,1)[-2:]
@@ -119,13 +122,14 @@ class Simulation:
     def ca_Pred_Function(self):
         y0 = ca.MX.sym('y0', 6,1)
         dU = ca.MX.sym('dU', 6,1)
-        
-        self.alphas.append(self.alphas[-1] + dU[0])
-        self.N_RotS.append(self.N_RotS[-1] + dU[1])
+        alphas = self.alphas
+        N_RotS = self.N_RotS
+        alphas.append(alphas[-1] + dU[0])
+        N_RotS.append(N_RotS[-1] + dU[1])
         init_m = y0[-2]
         init_p = y0[-1]
-        self.alphas = self.alphas[1:]
-        self.N_RotS = self.N_RotS[1:]
+        alphas = alphas[1:]
+        N_RotS = N_RotS[1:]
         
          # Variáveis CasADi
         x = ca.MX.sym('x', 2)
@@ -141,16 +145,17 @@ class Simulation:
         F = ca.integrator('F', 'cvodes', ode, 0,self.dt)
 
         for j in range(self.p):
+            x0 = [init_m, init_p]
             if j < self.m:
-                params = [self.alphas[j-1], self.N_RotS[j-1]]
-            sol = F(x0 = [init_m, init_p], p=params)
+                params = [alphas[j-1], N_RotS[j-1]]
+            sol = F(x0 = x0, p=params)
             xf_values = np.array(sol["xf"])
             aux1, aux2 = xf_values
             init_m = aux1[-1]
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
             if j < self.m:
-                self.u.append([self.alphas[j], self.N_RotS[j]])
+                self.u.append([alphas[j], N_RotS[j]])
 
         self.y = np.array(self.y).reshape(-1,1)
         self.uk = np.array(self.u).reshape(-1,1)[-2:]

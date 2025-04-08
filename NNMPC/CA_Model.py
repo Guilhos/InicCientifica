@@ -176,8 +176,8 @@ if __name__ == '__main__':
     p = 100
     m = 3
 
-    sim = Simulation(3,3)
-    sim_mf = Simulation(100,3)
+    sim = Simulation(3,3,3)
+    sim_mf = Simulation(100,3,3)
     y0, u0 = sim.pIniciais()
     nU = len(u0) // m
     dU = [[0],[0],[0],[0],[0],[0]]
