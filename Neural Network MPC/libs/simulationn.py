@@ -31,7 +31,8 @@ class Simulation:
 
         interp = Interpolation('NNMPC/libs/tabela_phi.csv')
         interp.load_data()
-        self.lut = interp.interpolate()      
+        self.lut = interp.interpolate()
+        self.ca_PredFun = self.ca_Pred_Function()      
 
     def fun(self, variables, alpha, N, lut):
         (x, y) = variables  # x e y são escalares
@@ -77,16 +78,10 @@ class Simulation:
     
     def pPlanta(self, y0, dU, caller = None):
         self.y = []
-        if type(caller).__name__ == "Only_NMPC":
-            self.alphas.append(self.alphas[-1] + dU[0])
-            self.N_RotS.append(self.N_RotS[-1] + dU[1])
-            init_m = y0[-2]
-            init_p = y0[-1]
-        else:
-            self.alphas.append(self.alphas[-1] + float(dU[0]))
-            self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
-            init_m = y0[-2].item()
-            init_p = y0[-1].item()
+        self.alphas.append(self.alphas[-1] + float(dU[0]))
+        self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
+        init_m = y0[-2].item()
+        init_p = y0[-1].item()
         self.alphas = self.alphas[1:]
         self.N_RotS = self.N_RotS[1:]
         
@@ -121,6 +116,46 @@ class Simulation:
         print(self.uk)
         return self.y, self.uk
     
+    def ca_Pred_Function(self):
+        y0 = ca.MX.sym('y0', 6,1)
+        dU = ca.MX.sym('dU', 6,1)
+        
+        self.alphas.append(self.alphas[-1] + dU[0])
+        self.N_RotS.append(self.N_RotS[-1] + dU[1])
+        init_m = y0[-2]
+        init_p = y0[-1]
+        self.alphas = self.alphas[1:]
+        self.N_RotS = self.N_RotS[1:]
+        
+         # Variáveis CasADi
+        x = ca.MX.sym('x', 2)
+        p = ca.MX.sym('p', 2)  # Parâmetros (alpha e N)
+        alpha, N = p[0], p[1]  # Divisão dos parâmetros
+
+        # Solução Numérica
+        rhs = ca.vertcat((self.A1 / self.Lc) * ((self.lut(ca.vertcat(N, x[0])) * self.P1) - x[1]) * 1e3,
+                         (self.C**2) / 2 * (x[0] - alpha * self.kv * np.sqrt(x[1] * 1000 - self.P_out * 1000)))
+
+        ode = {'x': x, 'ode': rhs, 'p': p}
+
+        F = ca.integrator('F', 'cvodes', ode, 0,self.dt)
+
+        for j in range(self.p):
+            if j < self.m:
+                params = [self.alphas[j-1], self.N_RotS[j-1]]
+            sol = F(x0 = [init_m, init_p], p=params)
+            xf_values = np.array(sol["xf"])
+            aux1, aux2 = xf_values
+            init_m = aux1[-1]
+            init_p = aux2[-1]
+            self.y.append([aux1[0], aux2[0]])
+            if j < self.m:
+                self.u.append([self.alphas[j], self.N_RotS[j]])
+
+        self.y = np.array(self.y).reshape(-1,1)
+        self.uk = np.array(self.u).reshape(-1,1)[-2:]
+        return ca.Function('ca_PredFunction', [y0, dU], [self.y,self.uk])
+    
     def ySetPoint(self, nSP):
         SPlist = []
         for i in range(nSP):
@@ -136,6 +171,9 @@ if __name__ == '__main__':
     y0, u0 = sim.pIniciais()
 
     yPlanta = sim.pPlanta(y0, dU)
+    
+    caPred = sim.ca_PredFun(y0,dU)
+    print(caPred)
     
     SPlist = sim.ySetPoint(3)
     print(SPlist)
