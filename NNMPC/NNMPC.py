@@ -160,7 +160,7 @@ class PINN_MPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 300
+        iter = 160
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
@@ -200,10 +200,10 @@ class PINN_MPC():
             if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 100:
+            elif i == 60:
                 self.y_sp = np.array([[8.39637471], [6.4025308]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 200:
+            elif i == 110:
                 self.y_sp = np.array([[5.67905178], [5.85870524]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             

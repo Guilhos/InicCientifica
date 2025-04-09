@@ -79,14 +79,12 @@ class Simulation:
     
     def pPlanta(self, y0, dU, caller = None):
         self.y = []
-        alphas = self.alphas
-        N_RotS = self.N_RotS
-        alphas.append(alphas[-1] + float(dU[0]))
-        N_RotS.append(N_RotS[-1] + float(dU[1]))
+        self.alphas.append(self.alphas[-1] + float(dU[0]))
+        self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
         init_m = y0[-2].item()
         init_p = y0[-1].item()
-        alphas = alphas[1:]
-        N_RotS = N_RotS[1:]
+        self.alphas = self.alphas[1:]
+        self.N_RotS = self.N_RotS[1:]
         
 
          # Variáveis CasADi
@@ -104,7 +102,7 @@ class Simulation:
 
         for j in range(self.p):
             if j < self.m:
-                params = [alphas[j-1], N_RotS[j-1]]
+                params = [self.alphas[j-1], self.N_RotS[j-1]]
             sol = F(x0 = [init_m, init_p], p = params)
             xf_values = np.array(sol["xf"])
             aux1, aux2 = xf_values
@@ -112,7 +110,7 @@ class Simulation:
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
             if j < self.m:
-                self.u.append([alphas[j], N_RotS[j]])
+                self.u.append([self.alphas[j], self.N_RotS[j]])
 
         self.y = np.array(self.y).reshape(-1,1)
         self.uk = np.array(self.u).reshape(-1,1)[-2:]
@@ -143,14 +141,15 @@ class Simulation:
         ode = {'x': x, 'ode': rhs, 'p': p}
 
         F = ca.integrator('F', 'cvodes', ode, 0,self.dt)
-
+        res = F(x0 = x, p=p)
+        x_next = res["xf"]
+        F = ca.Function('ca_F', [x, p], [x_next])
         for j in range(self.p):
             x0 = [init_m, init_p]
             if j < self.m:
                 params = [alphas[j-1], N_RotS[j-1]]
-            sol = F(x0 = x0, p=params)
-            xf_values = np.array(sol["xf"])
-            aux1, aux2 = xf_values
+            X_next = F(x = x0, p=params)
+            aux1, aux2 = X_next
             init_m = aux1[-1]
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
