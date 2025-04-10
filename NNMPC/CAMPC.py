@@ -79,7 +79,7 @@ class Only_NMPC():
 
         # Definição das variáveis de decisão
         dUs = opti.variable(self.nU * self.m, 1)
-        Fs = opti.variable(1, 1)  # Variável escalar para Fs
+        Fs  = opti.variable(1, 1)  # Variável escalar para Fs
         yModelk = opti.parameter(self.nY * self.steps, 1)
         uModelk = opti.parameter(self.nU * self.steps, 1)
         yPlantak = opti.parameter(self.nY, 1)
@@ -95,7 +95,7 @@ class Only_NMPC():
         dYk = ca.repmat(dYk, self.p, 1)
 
         # Predição do modelo
-        yModel_pred = self.sim_pred.pPlanta(yModelk, dUs, caller=self)
+        yModel_pred = self.sim_pred.ca_YPredFun(yModelk, dUs)
         
         # Matriz triangular para os controles
         matriz_inferior = self.matriz_triangular_identidade(self.m, self.m, self.nU)
@@ -131,7 +131,9 @@ class Only_NMPC():
         dYk = ypk - ymk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
         dU_init = self.dU
-        Fs_init = (ypk - self.y_sp + dYk).T @ self.q @ (ypk - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
+        yModel_init = self.sim_pred.ca_YPredFun(ymk,dU_init)
+        yModel_init = np.array(yModel_init.full())
+        Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
         x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
 
@@ -157,7 +159,7 @@ class Only_NMPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 300
+        iter = 160
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
@@ -170,7 +172,8 @@ class Only_NMPC():
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
 
-            ymk, _ = self.sim_mf.pPlanta(ymk, self.dUk)
+            ymk_next = self.sim_mf.ca_YPredFun(ymk, self.dU)
+            ymk_next = np.array(ymk_next.full())
             
             t2 =  time.time()
             Tempos.append(t2-t1)
@@ -190,72 +193,87 @@ class Only_NMPC():
             print(dU_opt[:self.m*self.nU])
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
+            
             if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 100:
+            elif i == 60:
                 self.y_sp = np.array([[8.39637471], [6.4025308]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 200:
+            elif i == 110:
                 self.y_sp = np.array([[5.67905178], [5.85870524]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+                
+        self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
+        
+        return dU_opt
             
+    def plot_results(self, iter, Ymk, Ypk, Upk, YspM, YspP, Tempos):
+        import matplotlib.pyplot as plt
+        import numpy as np
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))
 
-        x = np.linspace(0,iter,iter)
+        x = np.linspace(0, iter, iter)
         YspM = np.array(YspM)
         YspP = np.array(YspP)
-        axes[0][0].plot(x/2, np.array(Ymk)[:,0], label="resM", color = 'green')
-        axes[0][0].plot(x/2, np.array(Ypk)[:,0], label="plantaM", color="blue")
-        axes[0][0].plot(x/2, YspM.squeeze(), linestyle="--", color="red", label="y_sp")
-        axes[0][0].plot([0,iter/2], [3.5,3.5], linestyle="--", color="black")
-        axes[0][0].plot([0,iter/2], [12.3,12.3], linestyle="--", color="black")
+
+        # Vazão x Tempo
+        axes[0][0].plot(x / 2, np.array(Ymk)[:, 0], label="Modelo", color='green')
+        axes[0][0].plot(x / 2, np.array(Ypk)[:, 0], label="Planta", color="blue")
+        axes[0][0].plot(x / 2, YspM.squeeze(), linestyle="--", color="red", label="y_sp")
+        axes[0][0].plot([0, iter / 2], [3.5, 3.5], linestyle="--", color="black")
+        axes[0][0].plot([0, iter / 2], [12.3, 12.3], linestyle="--", color="black")
         axes[0][0].set_title("Vazão x Tempo")
         axes[0][0].set_ylabel("Vazão / kg/s")
         axes[0][0].set_xlabel("Tempo / s")
         axes[0][0].legend()
         axes[0][0].grid()
-        axes[0][0].set_ylim(3,12.8)
+        axes[0][0].set_ylim(3, 12.8)
 
-        axes[0][1].plot(x/2, np.array(Ymk)[:,1], label="resP", color="green")
-        axes[0][1].plot(x/2, np.array(Ypk)[:,1], label="plantaM", color="blue")
-        axes[0][1].plot(x/2, YspP.squeeze(), linestyle="--", color="red", label="y_sp")
-        axes[0][1].plot([0,iter/2], [5.27,5.27], linestyle="--", color="black")
-        axes[0][1].plot([0,iter/2], [9.3,9.3], linestyle="--", color="black")
+        # Pressão x Tempo
+        axes[0][1].plot(x / 2, np.array(Ymk)[:, 1], label="Modelo", color="green")
+        axes[0][1].plot(x / 2, np.array(Ypk)[:, 1], label="Planta", color="blue")
+        axes[0][1].plot(x / 2, YspP.squeeze(), linestyle="--", color="red", label="y_sp")
+        axes[0][1].plot([0, iter / 2], [5.27, 5.27], linestyle="--", color="black")
+        axes[0][1].plot([0, iter / 2], [9.3, 9.3], linestyle="--", color="black")
         axes[0][1].set_title("Pressão x Tempo")
         axes[0][1].set_ylabel("Pressão / kPa")
         axes[0][1].set_xlabel("Tempo / s")
         axes[0][1].legend()
         axes[0][1].grid()
-        axes[0][1].set_ylim(4.77,9.83)
-        
-        axes[1][0].plot(x/2, np.array(Upk)[:,0], label="Alpha", color="green")
-        axes[1][0].plot([0,iter/2], [0.35,0.35], linestyle="--", color="black")
-        axes[1][0].plot([0,iter/2], [0.65,0.65], linestyle="--", color="black")
+        axes[0][1].set_ylim(4.77, 9.83)
+
+        # Abertura da Válvula x Tempo
+        axes[1][0].plot(x / 2, np.array(Upk)[:, 0], label="Alpha", color="green")
+        axes[1][0].plot([0, iter / 2], [0.35, 0.35], linestyle="--", color="black")
+        axes[1][0].plot([0, iter / 2], [0.65, 0.65], linestyle="--", color="black")
         axes[1][0].set_title("Abertura da Válvula x Tempo")
         axes[1][0].set_ylabel("Alpha / %")
         axes[1][0].set_xlabel("Tempo / s")
         axes[1][0].legend()
         axes[1][0].grid()
 
-        axes[1][1].plot(x/2, np.array(Upk)[:,1], label="N", color="green")
-        axes[1][1].plot([0,iter/2], [27e3,27e3], linestyle="--", color="black")
-        axes[1][1].plot([0,iter/2], [5e4,5e4], linestyle="--", color="black")
-        axes[1][1].set_title("Velocidade de rotacao x Tempo")
-        axes[1][1].set_ylabel("N / hz")
+        # Velocidade de Rotação x Tempo
+        axes[1][1].plot(x / 2, np.array(Upk)[:, 1], label="N", color="green")
+        axes[1][1].plot([0, iter / 2], [27e3, 27e3], linestyle="--", color="black")
+        axes[1][1].plot([0, iter / 2], [5e4, 5e4], linestyle="--", color="black")
+        axes[1][1].set_title("Velocidade de Rotação x Tempo")
+        axes[1][1].set_ylabel("N / Hz")
         axes[1][1].set_xlabel("Tempo / s")
         axes[1][1].legend()
         axes[1][1].grid()
 
+        # Tempo por Iteração
         axes[2][0].plot(x, Tempos, label="Tempo", color="green")
-        axes[2][0].plot([0,iter], [0.5,0.5],linestyle = "--", color="black")
+        axes[2][0].plot([0, iter], [0.5, 0.5], linestyle="--", color="black")
         axes[2][0].set_title("Tempo por Iteração")
         axes[2][0].set_ylabel("Tempo / s")
         axes[2][0].set_xlabel("Iteração")
         axes[2][0].legend()
         axes[2][0].grid()
-        
+
+        # Histograma das Frequências de Tempo
         axes[2][1].hist(Tempos, bins=20, color='blue', alpha=0.7, edgecolor='black')
         axes[2][1].set_title("Histograma das Frequências de Tempo")
         axes[2][1].set_xlabel("Tempo")
@@ -263,10 +281,7 @@ class Only_NMPC():
 
         plt.suptitle("Comparação de resM e resP")
         plt.tight_layout()
-
         plt.show()
-
-        return dU_opt
 
 if __name__ == '__main__':
 

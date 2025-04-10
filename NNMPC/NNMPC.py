@@ -207,62 +207,73 @@ class PINN_MPC():
                 self.y_sp = np.array([[5.67905178], [5.85870524]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             
-
+        self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
+        
+        return dU_opt
+    
+    def plot_results(self, iter, Ymk, Ypk, Upk, YspM, YspP, Tempos):
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))
 
-        x = np.linspace(0,iter,iter)
+        x = np.linspace(0, iter, iter)
         YspM = np.array(YspM)
         YspP = np.array(YspP)
-        axes[0][0].plot(x/2, np.array(Ymk)[:,0], label="resM", color = 'green')
-        axes[0][0].plot(x/2, np.array(Ypk)[:,0], label="plantaM", color="blue")
-        axes[0][0].plot(x/2, YspM.squeeze(), linestyle="--", color="red", label="y_sp")
-        axes[0][0].plot([0,iter/2], [3.5,3.5], linestyle="--", color="black")
-        axes[0][0].plot([0,iter/2], [12.3,12.3], linestyle="--", color="black")
+
+        # Vazão x Tempo
+        axes[0][0].plot(x / 2, np.array(Ymk)[:, 0], label="Modelo", color='green')
+        axes[0][0].plot(x / 2, np.array(Ypk)[:, 0], label="Planta", color="blue")
+        axes[0][0].plot(x / 2, YspM.squeeze(), linestyle="--", color="red", label="y_sp")
+        axes[0][0].plot([0, iter / 2], [3.5, 3.5], linestyle="--", color="black")
+        axes[0][0].plot([0, iter / 2], [12.3, 12.3], linestyle="--", color="black")
         axes[0][0].set_title("Vazão x Tempo")
         axes[0][0].set_ylabel("Vazão / kg/s")
         axes[0][0].set_xlabel("Tempo / s")
         axes[0][0].legend()
         axes[0][0].grid()
-        axes[0][0].set_ylim(3,12.8)
+        axes[0][0].set_ylim(3, 12.8)
 
-        axes[0][1].plot(x/2, np.array(Ymk)[:,1], label="resP", color="green")
-        axes[0][1].plot(x/2, np.array(Ypk)[:,1], label="plantaM", color="blue")
-        axes[0][1].plot(x/2, YspP.squeeze(), linestyle="--", color="red", label="y_sp")
-        axes[0][1].plot([0,iter/2], [5.27,5.27], linestyle="--", color="black")
-        axes[0][1].plot([0,iter/2], [9.3,9.3], linestyle="--", color="black")
+        # Pressão x Tempo
+        axes[0][1].plot(x / 2, np.array(Ymk)[:, 1], label="Modelo", color="green")
+        axes[0][1].plot(x / 2, np.array(Ypk)[:, 1], label="Planta", color="blue")
+        axes[0][1].plot(x / 2, YspP.squeeze(), linestyle="--", color="red", label="y_sp")
+        axes[0][1].plot([0, iter / 2], [5.27, 5.27], linestyle="--", color="black")
+        axes[0][1].plot([0, iter / 2], [9.3, 9.3], linestyle="--", color="black")
         axes[0][1].set_title("Pressão x Tempo")
         axes[0][1].set_ylabel("Pressão / kPa")
         axes[0][1].set_xlabel("Tempo / s")
         axes[0][1].legend()
         axes[0][1].grid()
-        axes[0][1].set_ylim(4.77,9.83)
-        
-        axes[1][0].plot(x/2, np.array(Upk)[:,0], label="Alpha", color="green")
-        axes[1][0].plot([0,iter/2], [0.35,0.35], linestyle="--", color="black")
-        axes[1][0].plot([0,iter/2], [0.65,0.65], linestyle="--", color="black")
+        axes[0][1].set_ylim(4.77, 9.83)
+
+        # Abertura da Válvula x Tempo
+        axes[1][0].plot(x / 2, np.array(Upk)[:, 0], label="Alpha", color="green")
+        axes[1][0].plot([0, iter / 2], [0.35, 0.35], linestyle="--", color="black")
+        axes[1][0].plot([0, iter / 2], [0.65, 0.65], linestyle="--", color="black")
         axes[1][0].set_title("Abertura da Válvula x Tempo")
         axes[1][0].set_ylabel("Alpha / %")
         axes[1][0].set_xlabel("Tempo / s")
         axes[1][0].legend()
         axes[1][0].grid()
 
-        axes[1][1].plot(x/2, np.array(Upk)[:,1], label="N", color="green")
-        axes[1][1].plot([0,iter/2], [27e3,27e3], linestyle="--", color="black")
-        axes[1][1].plot([0,iter/2], [5e4,5e4], linestyle="--", color="black")
-        axes[1][1].set_title("Velocidade de rotacao x Tempo")
-        axes[1][1].set_ylabel("N / hz")
+        # Velocidade de Rotação x Tempo
+        axes[1][1].plot(x / 2, np.array(Upk)[:, 1], label="N", color="green")
+        axes[1][1].plot([0, iter / 2], [27e3, 27e3], linestyle="--", color="black")
+        axes[1][1].plot([0, iter / 2], [5e4, 5e4], linestyle="--", color="black")
+        axes[1][1].set_title("Velocidade de Rotação x Tempo")
+        axes[1][1].set_ylabel("N / Hz")
         axes[1][1].set_xlabel("Tempo / s")
         axes[1][1].legend()
         axes[1][1].grid()
 
+        # Tempo por Iteração
         axes[2][0].plot(x, Tempos, label="Tempo", color="green")
-        axes[2][0].plot([0,iter], [0.5,0.5],linestyle = "--", color="black")
+        axes[2][0].plot([0, iter], [0.5, 0.5], linestyle="--", color="black")
         axes[2][0].set_title("Tempo por Iteração")
         axes[2][0].set_ylabel("Tempo / s")
         axes[2][0].set_xlabel("Iteração")
         axes[2][0].legend()
         axes[2][0].grid()
-        
+
+        # Histograma das Frequências de Tempo
         axes[2][1].hist(Tempos, bins=20, color='blue', alpha=0.7, edgecolor='black')
         axes[2][1].set_title("Histograma das Frequências de Tempo")
         axes[2][1].set_xlabel("Tempo")
@@ -270,10 +281,7 @@ class PINN_MPC():
 
         plt.suptitle("Comparação de resM e resP")
         plt.tight_layout()
-
         plt.show()
-
-        return dU_opt
 
 if __name__ == '__main__':
 
