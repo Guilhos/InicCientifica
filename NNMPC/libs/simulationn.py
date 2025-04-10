@@ -120,14 +120,12 @@ class Simulation:
     def ca_Pred_Function(self):
         y0 = ca.MX.sym('y0', 6,1)
         dU = ca.MX.sym('dU', 6,1)
-        alphas = self.alphas
-        N_RotS = self.N_RotS
-        alphas.append(alphas[-1] + dU[0])
-        N_RotS.append(N_RotS[-1] + dU[1])
+        self.alphas.append(dU[0])
+        self.N_RotS.append(dU[1])
         init_m = y0[-2]
         init_p = y0[-1]
-        alphas = alphas[1:]
-        N_RotS = N_RotS[1:]
+        self.alphas = self.alphas[1:]
+        self.N_RotS = self.N_RotS[1:]
         
          # Variáveis CasADi
         x = ca.MX.sym('x', 2)
@@ -143,18 +141,18 @@ class Simulation:
         F = ca.integrator('F', 'cvodes', ode, 0,self.dt)
         res = F(x0 = x, p=p)
         x_next = res["xf"]
-        F = ca.Function('ca_F', [x, p], [x_next])
+        F2 = ca.Function('ca_F', [x, p], [x_next])
         for j in range(self.p):
             x0 = [init_m, init_p]
             if j < self.m:
-                params = [alphas[j-1], N_RotS[j-1]]
-            X_next = F(x = x0, p=params)
+                params = [self.alphas[j-1], self.N_RotS[j-1]]
+            X_next = F2(x = x0, p=params)
             aux1, aux2 = X_next
             init_m = aux1[-1]
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
             if j < self.m:
-                self.u.append([alphas[j], N_RotS[j]])
+                self.u.append([self.alphas[j], self.N_RotS[j]])
 
         self.y = np.array(self.y).reshape(-1,1)
         self.uk = np.array(self.u).reshape(-1,1)[-2:]
