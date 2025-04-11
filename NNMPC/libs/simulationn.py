@@ -80,12 +80,8 @@ class Simulation:
     
     def pPlanta(self, y0, dU, caller = None):
         self.y = []
-        self.alphas.append(self.alphas[-1] + float(dU[0]))
-        self.N_RotS.append(self.N_RotS[-1] + float(dU[1]))
         init_m = y0[-2].item()
         init_p = y0[-1].item()
-        self.alphas = self.alphas[1:]
-        self.N_RotS = self.N_RotS[1:]
         
          # Variáveis CasADi
         x = ca.MX.sym('x', 2)
@@ -102,7 +98,9 @@ class Simulation:
 
         for j in range(self.p):
             if j < self.m:
-                params = [self.alphas[j-1], self.N_RotS[j-1]]
+                self.alphas.append(self.alphas[-1] + dU[2*j])
+                self.N_RotS.append(self.N_RotS[-1] + dU[2*j+1])
+            params = [self.alphas[-1], self.N_RotS[-1]]
             sol = F(x0 = [init_m, init_p], p = params)
             xf_values = np.array(sol["xf"])
             aux1, aux2 = xf_values
@@ -110,7 +108,7 @@ class Simulation:
             init_p = aux2[-1]
             self.y.append([aux1[0], aux2[0]])
             if j < self.m:
-                self.u.append([self.alphas[j], self.N_RotS[j]])
+                self.u.append([self.alphas[-1], self.N_RotS[-1]])
 
         self.y = np.array(self.y).reshape(-1,1)
         self.uk = np.array(self.u).reshape(-1,1)[-2:]
@@ -178,6 +176,7 @@ if __name__ == '__main__':
     y0, u0 = sim.pIniciais()
 
     yPlanta = sim.pPlanta(y0, dU)
+    print(yPlanta)
     
     caPred = sim.ca_YPredFun(y0,dU)
     print(caPred)

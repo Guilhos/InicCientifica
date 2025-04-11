@@ -139,8 +139,7 @@ class PINN_MPC():
         x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
 
         dU_opt = x_opt[:self.nU * self.m]
-        #stats = self.opti_nlp.stats()
-        #print(stats)
+        dU_opt = np.array(dU_opt.full())
         return dU_opt
     
     def run(self):
@@ -165,11 +164,12 @@ class PINN_MPC():
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
             dU_opt= self.otimizar(ymk, umk, ypk)
-            #print(stats)
+            
             self.dUk = dU_opt[:self.nU]
             self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
             self.dU = self.dU[self.nU:]
             
+            umk = umk.reshape(6, 1)
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
             
@@ -178,6 +178,7 @@ class PINN_MPC():
             xmk = ca.vertcat(ymk[-self.nY:],umk[-self.nU:])
 
             ymk_next = self.CAMod.f_function(xm_2,xm_1,xmk)
+            ymk_next = np.array(ymk_next.full())
             
             t2 =  time.time()
             Tempos.append(t2-t1)

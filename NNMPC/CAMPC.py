@@ -138,8 +138,7 @@ class Only_NMPC():
         x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
 
         dU_opt = x_opt[:self.nU * self.m]
-        #stats = self.opti_nlp.stats()
-        #print(stats)
+        dU_opt = np.array(dU_opt.full())
         return dU_opt
     
     def run(self):
@@ -163,12 +162,13 @@ class Only_NMPC():
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
-            dU_opt= self.otimizar(ymk, umk, ypk)
+            dU_opt = self.otimizar(ymk, umk, ypk)
             #print(stats)
             self.dUk = dU_opt[:self.nU]
             self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
             self.dU = self.dU[self.nU:]
             
+            umk = umk.reshape(6, 1)
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
 
@@ -180,6 +180,8 @@ class Only_NMPC():
             print(f'Tempo decorrido: {t2-t1}')
             
             ypk, upk = self.sim_mf.pPlanta(ypk, self.dUk)
+
+            print(ymk_next - ypk)
             
             upk = upk.flatten()
             ypk = ypk.flatten()
@@ -187,7 +189,7 @@ class Only_NMPC():
             ymk = np.append(ymk, ymk_next)
             ymk = ymk[self.nY:]
 
-            Ymk.append(ymk[-self.nY:])
+            Ymk.append(ymk_next)
             Ypk.append(ypk)
             Upk.append(upk)
             print(dU_opt[:self.m*self.nU])
