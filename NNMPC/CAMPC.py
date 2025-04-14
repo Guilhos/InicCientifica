@@ -158,21 +158,20 @@ class Only_NMPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 160
+        iter = 60
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
             dU_opt = self.otimizar(ymk, umk, ypk)
             #print(stats)
             self.dUk = dU_opt[:self.nU]
-            self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
-            self.dU = self.dU[self.nU:]
+            self.dU = dU_opt
             
             umk = umk.reshape(6, 1)
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
 
-            ymk_next = self.sim_mf.ca_YPredFun(ymk, self.dU)
+            ymk_next = self.sim_mf.ca_YPredFun(ymk, dU_opt)
             ymk_next = np.array(ymk_next.full())
             
             t2 =  time.time()
@@ -199,20 +198,18 @@ class Only_NMPC():
             if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 60:
-                self.y_sp = np.array([[8.39637471], [6.4025308]])
-                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 110:
-                self.y_sp = np.array([[5.67905178], [5.85870524]])
-                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            # elif i == 60:
+            #     self.y_sp = np.array([[8.39637471], [6.4025308]])
+            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            # elif i == 110:
+            #     self.y_sp = np.array([[5.67905178], [5.85870524]])
+            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
                 
         self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
         
         return dU_opt
             
     def plot_results(self, iter, Ymk, Ypk, Upk, YspM, YspP, Tempos):
-        import matplotlib.pyplot as plt
-        import numpy as np
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))
 
