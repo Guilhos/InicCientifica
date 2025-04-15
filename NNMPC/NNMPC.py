@@ -166,8 +166,7 @@ class PINN_MPC():
             dU_opt= self.otimizar(ymk, umk, ypk)
             
             self.dUk = dU_opt[:self.nU]
-            self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
-            self.dU = self.dU[self.nU:]
+            self.dU = dU_opt
             
             umk = umk.reshape(6, 1)
             umk = np.append(umk, umk[-self.nU:] + self.dUk)

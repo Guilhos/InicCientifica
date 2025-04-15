@@ -112,14 +112,14 @@ class Simulation:
 
         self.y = np.array(self.y).reshape(-1,1)
         self.uk = np.array(self.u).reshape(-1,1)[-2:]
-        print(self.uk)
+        print('Uk: ',self.uk)
         return self.y, self.uk
     
     def ca_Pred_Function(self):
         y0 = ca.MX.sym('y0', 6,1)
         dU = ca.MX.sym('dU', 6,1)
-        alphas1 = self.alphas.copy()
-        N_RotS1 = self.N_RotS.copy()
+        alphasMX = ca.MX.sym('alphas', 3,1)
+        N_RotSMX = ca.MX.sym('N_RotS', 3,1)
         init_m = y0[-2]
         init_p = y0[-1]
         
@@ -144,19 +144,19 @@ class Simulation:
         
         for j in range(self.p):
             if j < self.m:
-                alphas1.append(alphas1[-1] + dU[2*j])
-                N_RotS1.append(N_RotS1[-1] + dU[2*j+1])
-            params = [alphas1[-1], N_RotS1[-1]]
-            X_next = F(ca.vertcat(init_m, init_p), ca.vertcat(*params))
+                alphasMX = ca.vertcat(alphasMX, alphasMX[-1] + dU[2*j])
+                N_RotSMX = ca.vertcat(N_RotSMX, N_RotSMX[-1] + dU[2*j+1])
+            params = ca.vertcat(alphasMX[-1], N_RotSMX[-1])
+            X_next = F(ca.vertcat(init_m, init_p), params)
             aux1 = X_next[0]
             aux2 = X_next[1]
             init_m = aux1[-1]
             init_p = aux2[-1]
-            y = ca.vertcat(y, aux1[0], aux2[0])
+            y = ca.vertcat(y, aux1, aux2)
             if j < self.m:
-                u = ca.vertcat(u, alphas1[-1], N_RotS1[-1])
+                u = ca.vertcat(u, alphasMX[-1], N_RotSMX[-1])
         
-        Y_trend = ca.Function('ca_PredYFunction', [y0, dU], [y])
+        Y_trend = ca.Function('ca_PredYFunction', [y0, dU, alphasMX, N_RotSMX], [y, alphasMX[-3:], N_RotSMX[-3:]])
         U_trend = ca.Function('ca_PredUFunction', [y0, dU], [u])
         
         return Y_trend, U_trend
@@ -178,9 +178,9 @@ if __name__ == '__main__':
     yPlanta = sim.pPlanta(y0, dU)
     print(yPlanta)
     
-    caPred = sim.ca_YPredFun(y0,dU)
+    caPred = sim.ca_YPredFun(y0,dU,[0.5]*3, [38500]*3)
+    
     print(caPred)
-    print(sim.ca_UPredFun(y0,dU))
 
 
 

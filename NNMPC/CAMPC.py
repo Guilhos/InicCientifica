@@ -163,8 +163,10 @@ class Only_NMPC():
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
             dU_opt = self.otimizar(ymk, umk, ypk)
-            #print(stats)
+            
             self.dUk = dU_opt[:self.nU]
+            # self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
+            # self.dU = self.dU[self.nU:]
             self.dU = dU_opt
             
             umk = umk.reshape(6, 1)
@@ -180,7 +182,7 @@ class Only_NMPC():
             
             ypk, upk = self.sim_mf.pPlanta(ypk, self.dUk)
 
-            print(ymk_next - ypk)
+            print('dYk: ',ymk_next - ypk)
             
             upk = upk.flatten()
             ypk = ypk.flatten()
@@ -191,7 +193,7 @@ class Only_NMPC():
             Ymk.append(ymk_next)
             Ypk.append(ypk)
             Upk.append(upk)
-            print(dU_opt[:self.m*self.nU])
+            print('dUk: ',dU_opt[:self.m*self.nU])
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
             
@@ -285,9 +287,9 @@ class Only_NMPC():
 if __name__ == '__main__':
 
     qVazao = 1/12.5653085708618164062**2
-    qPressao = 0.1/9.30146217346191406250**2
-    rAlpha = 0.01/0.15**2
-    rN = 1e-4/5000**2
+    qPressao = 0/9.30146217346191406250**2
+    rAlpha = 0/0.15**2
+    rN = 0/5000**2
 
 
     p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
