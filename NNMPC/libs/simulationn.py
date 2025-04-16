@@ -118,8 +118,8 @@ class Simulation:
     def ca_Pred_Function(self):
         y0 = ca.MX.sym('y0', 6,1)
         dU = ca.MX.sym('dU', 6,1)
-        alphasMX = ca.MX.sym('alphas', 3,1)
-        N_RotSMX = ca.MX.sym('N_RotS', 3,1)
+        alphas_init = ca.MX.sym('alphas_init', 3, 1)  # Valores iniciais de alphas
+        N_RotS_init = ca.MX.sym('N_RotS_init', 3, 1)  # Valores iniciais de N_RotS
         init_m = y0[-2]
         init_p = y0[-1]
         
@@ -141,23 +141,25 @@ class Simulation:
         
         y = ca.MX()
         u = ca.MX()
+        alphasMX = alphas_init  # Use os valores iniciais como simbólicos
+        N_RotSMX = N_RotS_init  # Use os valores iniciais como simbólicos
         
         for j in range(self.p):
             if j < self.m:
                 alphasMX = ca.vertcat(alphasMX, alphasMX[-1] + dU[2*j])
+                alphasMX = alphasMX[1:]
                 N_RotSMX = ca.vertcat(N_RotSMX, N_RotSMX[-1] + dU[2*j+1])
+                N_RotSMX = N_RotSMX[1:]
             params = ca.vertcat(alphasMX[-1], N_RotSMX[-1])
             X_next = F(ca.vertcat(init_m, init_p), params)
-            aux1 = X_next[0]
-            aux2 = X_next[1]
-            init_m = aux1[-1]
-            init_p = aux2[-1]
-            y = ca.vertcat(y, aux1, aux2)
+            init_m = X_next[0]
+            init_p = X_next[1]
+            y = ca.vertcat(y, init_m, init_p)
             if j < self.m:
                 u = ca.vertcat(u, alphasMX[-1], N_RotSMX[-1])
         
-        Y_trend = ca.Function('ca_PredYFunction', [y0, dU, alphasMX, N_RotSMX], [y, alphasMX[-3:], N_RotSMX[-3:]])
-        U_trend = ca.Function('ca_PredUFunction', [y0, dU], [u])
+        Y_trend = ca.Function('ca_PredYFunction', [y0, dU, alphas_init, N_RotS_init], [y, alphasMX, N_RotSMX])
+        U_trend = ca.Function('ca_PredUFunction', [y0, dU, alphas_init, N_RotS_init], [u, alphasMX, N_RotSMX])
         
         return Y_trend, U_trend
     

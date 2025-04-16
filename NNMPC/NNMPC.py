@@ -279,7 +279,7 @@ class PINN_MPC():
         axes[2][1].set_xlabel("Tempo")
         axes[2][1].set_ylabel("Frequência")
 
-        plt.suptitle("Comparação de resM e resP")
+        plt.suptitle("Resultados NMPC - PIRNN", fontsize=16)
         plt.tight_layout()
         plt.show()
 

@@ -84,6 +84,9 @@ class Only_NMPC():
         uModelk = opti.parameter(self.nU * self.steps, 1)
         yPlantak = opti.parameter(self.nY, 1)
         ysp = opti.parameter(self.nY * self.p, 1)# yPlantak como parâmetro
+        alphak = opti.parameter(3, 1)  # Parâmetro para alphas
+        nrotk = opti.parameter(3, 1)  # Parâmetro para N_RotS
+
     
         x = ca.vertcat(dUs, Fs)
         
@@ -95,7 +98,7 @@ class Only_NMPC():
         dYk = ca.repmat(dYk, self.p, 1)
 
         # Predição do modelo
-        yModel_pred = self.sim_pred.ca_YPredFun(yModelk, dUs)
+        yModel_pred, _,_ = self.sim_pred.ca_YPredFun(yModelk, dUs, alphak, nrotk)
         
         # Matriz triangular para os controles
         matriz_inferior = self.matriz_triangular_identidade(self.m, self.m, self.nU)
@@ -123,19 +126,19 @@ class Only_NMPC():
         # Criando a função otimizada
         return opti.to_function(
             "opti_nlp",
-            [yModelk, uModelk, yPlantak, ysp, dUs, Fs],
+            [yModelk, uModelk, yPlantak, ysp, dUs, Fs, alphak, nrotk],
             [x]
         )
 
-    def otimizar(self, ymk, umk, ypk):
+    def otimizar(self, ymk, umk, ypk, alphaK, nrotK):
         dYk = ypk - ymk[-self.nY:]
         dYk = ca.repmat(dYk, self.p, 1)
         dU_init = self.dU
-        yModel_init = self.sim_pred.ca_YPredFun(ymk,dU_init)
+        yModel_init, _, _ = self.sim_pred.ca_YPredFun(ymk,dU_init,alphaK, nrotK)
         yModel_init = np.array(yModel_init.full())
         Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
 
-        x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
+        x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init, alphaK, nrotK)
 
         dU_opt = x_opt[:self.nU * self.m]
         dU_opt = np.array(dU_opt.full())
@@ -148,6 +151,8 @@ class Only_NMPC():
         ypk = ymk[-self.nY:]
         ymk_next = ypk
         self.opti_nlp = self.nlp_func()
+        alphaK = self.sim_mf.alphas
+        nrotK = self.sim_mf.N_RotS
 
         Ypk = []
         Upk = []
@@ -158,22 +163,20 @@ class Only_NMPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 60
+        iter = 160
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
-            dU_opt = self.otimizar(ymk, umk, ypk)
+            dU_opt = self.otimizar(ymk, umk, ypk, alphaK, nrotK)
             
             self.dUk = dU_opt[:self.nU]
-            # self.dU = ca.vertcat(dU_opt, np.zeros((self.nU, 1)))
-            # self.dU = self.dU[self.nU:]
             self.dU = dU_opt
             
             umk = umk.reshape(6, 1)
             umk = np.append(umk, umk[-self.nU:] + self.dUk)
             umk = umk[self.nU:]
 
-            ymk_next = self.sim_mf.ca_YPredFun(ymk, dU_opt)
+            ymk_next, alphaK, nrotK = self.sim_mf.ca_YPredFun(ymk, dU_opt, alphaK, nrotK)
             ymk_next = np.array(ymk_next.full())
             
             t2 =  time.time()
@@ -200,12 +203,12 @@ class Only_NMPC():
             if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            # elif i == 60:
-            #     self.y_sp = np.array([[8.39637471], [6.4025308]])
-            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            # elif i == 110:
-            #     self.y_sp = np.array([[5.67905178], [5.85870524]])
-            #     self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            elif i == 60:
+                self.y_sp = np.array([[8.39637471], [6.4025308]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
+            elif i == 110:
+                self.y_sp = np.array([[5.67905178], [5.85870524]])
+                self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
                 
         self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
         
@@ -280,17 +283,16 @@ class Only_NMPC():
         axes[2][1].set_xlabel("Tempo")
         axes[2][1].set_ylabel("Frequência")
 
-        plt.suptitle("Comparação de resM e resP")
+        plt.suptitle("Resultados NMPC - CasADi", fontsize=16)
         plt.tight_layout()
         plt.show()
 
 if __name__ == '__main__':
 
     qVazao = 1/12.5653085708618164062**2
-    qPressao = 0/9.30146217346191406250**2
+    qPressao = 0.1/9.30146217346191406250**2
     rAlpha = 0/0.15**2
-    rN = 0/5000**2
-
+    rN = 1e-4/5000**2
 
     p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
     mpc = Only_NMPC(p, m, q, r, steps)
