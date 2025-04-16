@@ -72,8 +72,8 @@ class PINN_MPC():
         self.dU_max = self.iTil(self.dU_max, self.m) # Expansão do dU_max para M. SHAPE -> (nU*M, 1)
         #self.dU_max = ca.DM(np.concatenate((self.dU_max,np.zeros((int(self.nU) * (self.p - self.m), 1))))) # Adição de P - M linhas de 0. SHAPE -> (nU*P, 1)
 
-        self.q = ca.DM(np.diag(np.array([q[0],q[1]] * (self.nY*self.p // 2)))) # Criação de uma matriz com os valores de Q na diagonal. SHAPE -> (nY*p, nY*p)
-        self.r = ca.DM(np.diag(np.array([r[0],r[1]] * (self.nU*self.m // 2)))) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
+        self.q = ca.DM(np.diag(np.array([self.q[0],self.q[1]] * (self.nY*self.p // 2)))) # Criação de uma matriz com os valores de Q na diagonal. SHAPE -> (nY*p, nY*p)
+        self.r = ca.DM(np.diag(np.array([self.r[0],self.r[1]] * (self.nU*self.m // 2)))) # Criação de uma matriz com os valores de R na diagonal. SHAPE -> (nU*p, nU*p)
 
     def nlp_func(self):
         # Criando o problema de otimização
@@ -159,7 +159,7 @@ class PINN_MPC():
         #Ymink = []
         #Ymaxk = []
 
-        iter = 160
+        iter = 130
         for i in range(iter):
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
@@ -200,16 +200,16 @@ class PINN_MPC():
             if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 60:
+            elif i == 50:
                 self.y_sp = np.array([[8.39637471], [6.4025308]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
-            elif i == 110:
+            elif i == 90:
                 self.y_sp = np.array([[5.67905178], [5.85870524]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             
-        self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
+        #self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
         
-        return dU_opt
+        return iter, Ymk, Ypk, Upk, YspM, YspP, Tempos
     
     def plot_results(self, iter, Ymk, Ypk, Upk, YspM, YspP, Tempos):
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))
