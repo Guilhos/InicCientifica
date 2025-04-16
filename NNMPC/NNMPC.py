@@ -114,7 +114,7 @@ class PINN_MPC():
 
         opti.solver('ipopt', {
             "ipopt.print_level": 0,
-            "ipopt.tol": 1e-4,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
+            "ipopt.tol": 1e-6,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
             "ipopt.max_iter": 500,                   # Reduz número de iterações (ajustável)
             "ipopt.mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
             "ipopt.linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
@@ -265,8 +265,12 @@ class PINN_MPC():
         axes[1][1].grid()
 
         # Tempo por Iteração
-        axes[2][0].plot(x, Tempos, label="Tempo", color="green")
+        indice_max = Tempos.index(max(Tempos))
+        for i, tempo in enumerate(Tempos):
+            cor = "red" if i == indice_max else "blue"
+            axes[2][0].bar(x[i], tempo, color=cor)
         axes[2][0].plot([0, iter], [0.5, 0.5], linestyle="--", color="black")
+        axes[2][0].plot([0, iter], [np.mean(Tempos), np.mean(Tempos)], linestyle="--", color="red", label=f"Média: {np.mean(Tempos):.2f} s")
         axes[2][0].set_title("Tempo por Iteração")
         axes[2][0].set_ylabel("Tempo / s")
         axes[2][0].set_xlabel("Iteração")
