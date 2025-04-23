@@ -21,6 +21,8 @@ def superPlot(iter_NN, Ymk_NN,
     YspP_NN = np.array(YspP_NN)
     YspM_CA = np.array(YspM_CA)
     YspP_CA = np.array(YspP_CA)
+    YmMin_NN = np.array(YmMin_NN)
+    YmMin_CA = np.array(YmMin_CA)
 
     # Vazão x Tempo
     plt.figure(figsize=(12,10))
@@ -179,8 +181,7 @@ ISE = [ISE_NN_M, ISE_NN_P, ISE_CA_M, ISE_CA_P]
 def calcular_ISDNV(sinal_controle):
     sinal_controle = np.array(sinal_controle)
     derivada = np.diff(sinal_controle)
-    delta_u_max = np.max(np.abs(derivada)) if np.max(np.abs(derivada)) != 0 else 1  # evita divisão por zero
-    isdnv = np.sum((derivada / delta_u_max) ** 2)
+    isdnv = np.sum((derivada / 0.1) ** 2)
     return isdnv
 
 ISDNV_CA_M = calcular_ISDNV(dUAlpha_CA)
