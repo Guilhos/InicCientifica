@@ -6,11 +6,11 @@ import os
 
 def superPlot(iter_NN, Ymk_NN,
               Ypk_NN, Upk_NN,
-              YspM_NN, YspP_NN,
+              YspM_NN, YspP_NN, YmMin_NN,
               Tempos_NN, iter_CA,
               Ymk_CA, Ypk_CA,
               Upk_CA, YspM_CA,
-              YspP_CA, Tempos_CA):
+              YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDNV):
     
     images_path = os.path.join("NNMPC", "images")
     os.makedirs(images_path, exist_ok=True)
@@ -27,26 +27,26 @@ def superPlot(iter_NN, Ymk_NN,
     plt.subplot(2, 1, 1)
     plt.plot(x_NN / 2, np.array(Ymk_NN)[:, 0], label="Modelo - Rede Neural", color='green')
     plt.plot(x_NN / 2, np.array(Ypk_NN)[:, 0], label="Planta - Rede Neural", color="blue")
-    plt.plot(x_NN / 2, YspM_NN.squeeze(), linestyle="--", color="red", label="y_sp")
-    plt.plot([0, iter_NN / 2], [3.5, 3.5], linestyle="--", color="black")
+    plt.plot(x_NN / 2, YspM_NN.squeeze(), linestyle="--", color="red", label="Set Point")
+    plt.plot(x_NN / 2, YmMin_NN.squeeze(), linestyle="--", color="red", label="Set Point")
     plt.plot([0, iter_NN / 2], [12.3, 12.3], linestyle="--", color="black")
     plt.title("Vazão x Tempo (NN)")
     plt.ylabel("Vazão / kg/s")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISE: {ISE[0]:.2f}")
     plt.grid()
     plt.ylim(3, 12.8)
 
     plt.subplot(2, 1, 2)
     plt.plot(x_CA / 2, np.array(Ymk_CA)[:, 0], label="Modelo - Nominal", color='green')
     plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 0], label="Planta - Nominal", color="blue")
-    plt.plot(x_CA / 2, YspM_CA.squeeze(), linestyle="--", color="red", label="y_sp")
-    plt.plot([0, iter_CA / 2], [3.5, 3.5], linestyle="--", color="black")
+    plt.plot(x_CA / 2, YspM_CA.squeeze(), linestyle="--", color="red", label="Set Point")
+    plt.plot(x_NN / 2, YmMin_CA.squeeze(), linestyle="--", color="red", label="Set Point")
     plt.plot([0, iter_CA / 2], [12.3, 12.3], linestyle="--", color="black")
     plt.title("Vazão x Tempo (CA)")
     plt.ylabel("Vazão / kg/s")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISE: {ISE[2]:.2f}")
     plt.grid()
     plt.ylim(3, 12.8)
     plt.tight_layout(h_pad=3.0)
@@ -65,7 +65,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.title("Pressão x Tempo (NN)")
     plt.ylabel("Pressão / kPa")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISE: {ISE[1]:.2f}")
     plt.grid()
     plt.ylim(4.77, 9.83)
 
@@ -78,7 +78,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.title("Pressão x Tempo (CA)")
     plt.ylabel("Pressão / kPa")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISE: {ISE[3]:.2f}")
     plt.grid()
     plt.ylim(4.77, 9.83)
     plt.tight_layout(h_pad=3.0)
@@ -95,7 +95,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.title("Abertura da Válvula x Tempo (NN)")
     plt.ylabel("Alpha / %")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISDNV: {ISDNV[0]:.2f}")
     plt.grid()
 
     plt.subplot(2, 1, 2)
@@ -105,7 +105,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.title("Abertura da Válvula x Tempo (CA)")
     plt.ylabel("Alpha / %")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISDNV: {ISDNV[2]:.2f}")
     plt.grid()
     plt.tight_layout(h_pad=3.0)
     plt.savefig(os.path.join(images_path, "abertura_valvula_tempo.png"))
@@ -121,7 +121,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.title("Velocidade de Rotação x Tempo (NN)")
     plt.ylabel("N / Hz")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISDNV: {ISDNV[1]:.2f}")
     plt.grid()
 
     plt.subplot(2, 1, 2)
@@ -131,36 +131,10 @@ def superPlot(iter_NN, Ymk_NN,
     plt.title("Velocidade de Rotação x Tempo (CA)")
     plt.ylabel("N / Hz")
     plt.xlabel("Tempo / s")
-    plt.legend()
+    plt.legend(title=f"ISDNV: {ISDNV[3]:.2f}")
     plt.grid()
     plt.tight_layout(h_pad=3.0)
     plt.savefig(os.path.join(images_path, "velocidade_rotacao_tempo.png"))
-    plt.show()
-    plt.close()
-
-    # Tempo por Iteração
-    plt.figure(figsize=(12,10))
-    plt.subplot(2, 1, 1)
-    plt.plot(x_NN, Tempos_NN, color="blue")
-    plt.plot([0, iter_NN], [0.5, 0.5], linestyle="--", color="black")
-    plt.plot([0, iter_NN], [np.mean(Tempos_NN), np.mean(Tempos_NN)], linestyle="--", color="red", label=f"Média: {np.mean(Tempos_NN):.2f} s")
-    plt.title("Tempo por Iteração (NN)")
-    plt.ylabel("Tempo / s")
-    plt.xlabel("Iteração")
-    plt.legend()
-    plt.grid()
-
-    plt.subplot(2, 1, 2)
-    plt.plot(x_CA, Tempos_CA, color="blue")
-    plt.plot([0, iter_CA], [0.5, 0.5], linestyle="--", color="black")
-    plt.plot([0, iter_CA], [np.mean(Tempos_CA), np.mean(Tempos_CA)], linestyle="--", color="red", label=f"Média: {np.mean(Tempos_CA):.2f} s")
-    plt.title("Tempo por Iteração (CA)")
-    plt.ylabel("Tempo / s")
-    plt.xlabel("Iteração")
-    plt.legend()
-    plt.grid()
-    plt.tight_layout(h_pad=3.0)
-    plt.savefig(os.path.join(images_path, "tempo_iteracao.png"))
     plt.show()
     plt.close()
 
@@ -187,13 +161,39 @@ rN = 1e-4/5000**2
 p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
 NNMPC = PINN_MPC(p, m, q, r, steps)
 CAMPC = Only_NMPC(p, m, q, r, steps)
-iter_NN, Ymk_NN, Ypk_NN, Upk_NN, YspM_NN, YspP_NN, Tempos_NN =  NNMPC.run()
-iter_CA, Ymk_CA, Ypk_CA, Upk_CA, YspM_CA, YspP_CA, Tempos_CA =  CAMPC.run()
+iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN =  NNMPC.run()
+iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA =  CAMPC.run()
+
+def calcular_ISE(referencia, saida):
+    erro = np.array(referencia) - np.array(saida)
+    ise = np.sum(erro**2)
+    return ise
+
+ISE_NN_M = calcular_ISE(YspM_NN, np.array(Ypk_NN)[:, 0])
+ISE_NN_P = calcular_ISE(YspP_NN, np.array(Ypk_NN)[:, 1])
+ISE_CA_M = calcular_ISE(YspM_CA, np.array(Ypk_CA)[:, 0])
+ISE_CA_P = calcular_ISE(YspP_CA, np.array(Ypk_CA)[:, 1])
+
+ISE = [ISE_NN_M, ISE_NN_P, ISE_CA_M, ISE_CA_P]
+
+def calcular_ISDNV(sinal_controle):
+    sinal_controle = np.array(sinal_controle)
+    derivada = np.diff(sinal_controle)
+    delta_u_max = np.max(np.abs(derivada)) if np.max(np.abs(derivada)) != 0 else 1  # evita divisão por zero
+    isdnv = np.sum((derivada / delta_u_max) ** 2)
+    return isdnv
+
+ISDNV_CA_M = calcular_ISDNV(dUAlpha_CA)
+ISDNV_CA_P = calcular_ISDNV(dURot_CA)
+ISDNV_NN_M = calcular_ISDNV(dUAlpha_NN)
+ISDNV_NN_P = calcular_ISDNV(dURot_NN)
+
+ISDNV = [ISDNV_NN_M, ISDNV_NN_P, ISDNV_CA_M, ISDNV_CA_P]
 
 superPlot(iter_NN, Ymk_NN,
           Ypk_NN, Upk_NN,
-          YspM_NN, YspP_NN,
+          YspM_NN, YspP_NN, YmMin_NN,
           Tempos_NN, iter_CA,
           Ymk_CA, Ypk_CA,
           Upk_CA, YspM_CA,
-          YspP_CA, Tempos_CA)
+          YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDNV)

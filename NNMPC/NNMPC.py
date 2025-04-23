@@ -33,6 +33,11 @@ class PINN_MPC():
         self.y_min = np.array([[3.5], [5.27]])
         self.y_max = np.array([[12.3], [9.3]])
 
+        self.params = [-4.117976349902422e+01,
+                        7.819497805337005e+01,
+                        -4.406691928857834e+01,
+                        8.836867650811681e+00]
+
         # Setpoint provisório
         self.y_sp = np.array([[7.74555396], [6.66187275]])
     
@@ -59,9 +64,16 @@ class PINN_MPC():
         
         return ca.DM(matriz)  # Convertendo para CasADi DM
 
+    def f_vazaoMin(self):
+        PP = ca.MX.sym('PP', 1)
+        P1 = 4.5
+        x = PP/P1
+        f = self.params[0] + self.params[1]*x + self.params[2]*x**2 + self.params[3]*x**3
+        return ca.Function('f_vazaoMin', [PP], [f])
+
     def ajusteMatrizes(self):
         self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1)
-        self.y_min = ca.DM(self.iTil(self.y_min,self.p)) # Expansão do y_min para P. SHAPE -> (nY*P, 1)
+         # Expansão do y_min para P. SHAPE -> (nY*P, 1)
         self.y_max = ca.DM(self.iTil(self.y_max,self.p)) # Expansão do y_max para P. SHAPE -> (nY*P, 1)
 
         self.u_min = ca.DM(self.iTil(self.u_min,self.m)) # Expansão do u_min para M. SHAPE -> (nU*M, 1)
@@ -86,6 +98,7 @@ class PINN_MPC():
         uModelk = opti.parameter(self.nU * self.steps, 1)
         yPlantak = opti.parameter(self.nY, 1)
         ysp = opti.parameter(self.nY * self.p, 1)# yPlantak como parâmetro
+        y_min = opti.parameter(self.nY * self.p, 1) # y_min como parâmetro
     
         x = ca.vertcat(dUs, Fs)
         
@@ -108,7 +121,7 @@ class PINN_MPC():
         opti.subject_to(opti.bounded(0, Fs, 10e23))
 
         # lbg e ubg
-        opti.subject_to(opti.bounded(self.y_min, yModel_pred, self.y_max))
+        opti.subject_to(opti.bounded(y_min, yModel_pred, self.y_max))
         opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.m, 1) + matriz_inferior @ dUs, self.u_max))
         opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dUs.T @ self.r @ dUs == 0)  # Restrições de igualdade
 
@@ -125,7 +138,7 @@ class PINN_MPC():
         # Criando a função otimizada
         return opti.to_function(
             "opti_nlp",
-            [yModelk, uModelk, yPlantak, ysp, dUs, Fs],
+            [yModelk, uModelk, yPlantak, ysp, dUs, Fs, y_min],
             [x]
         )
 
@@ -135,8 +148,9 @@ class PINN_MPC():
         dU_init = self.dU
         yModel_init = self.CAMod.pred_function(ymk,umk,dU_init)
         Fs_init = (yModel_init - self.y_sp + dYk).T @ self.q @ (yModel_init - self.y_sp + dYk) + dU_init.T @ self.r @ dU_init
+        y_minAux = ca.DM(self.iTil(self.y_min,self.p))
 
-        x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init)
+        x_opt = self.opti_nlp(ymk, umk, ypk, self.y_sp, dU_init, Fs_init, y_minAux)
 
         dU_opt = x_opt[:self.nU * self.m]
         dU_opt = np.array(dU_opt.full())
@@ -149,21 +163,29 @@ class PINN_MPC():
         ypk = ymk[-self.nY:]
         ymk_next = ypk
         self.opti_nlp = self.nlp_func()
+        self.mMin = self.f_vazaoMin()
 
         Ypk = []
         Upk = []
+        dUAlpha = []
+        dURot = []
         Ymk = []
         YspM = []
         YspP = []
+        YmMin = []
         Tempos = []
         #Ymink = []
         #Ymaxk = []
 
         iter = 130
         for i in range(iter):
+            mMink = self.mMin(ymk[-1])
+            mMink = np.array(mMink.full())
+            self.y_min = np.array([[float(mMink[0][0])], [5.27]])
+
             t1 = time.time()
             print(15*'='+ f'Iteração {i+1}' + 15*'=')
-            dU_opt= self.otimizar(ymk, umk, ypk)
+            dU_opt = self.otimizar(ymk, umk, ypk)
             
             self.dUk = dU_opt[:self.nU]
             self.dU = dU_opt
@@ -194,9 +216,13 @@ class PINN_MPC():
             Ymk.append(ymk[-self.nY:])
             Ypk.append(ypk)
             Upk.append(upk)
+            dUAlpha.append(self.dUk[0])
+            dURot.append(self.dUk[1])
             print(dU_opt[:self.m*self.nU])
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
+            YmMin.append(self.y_min[0])
+
             if i == 10:
                 self.y_sp = np.array([[10.09972032], [6.89841795]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
@@ -209,7 +235,7 @@ class PINN_MPC():
             
         #self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
         
-        return iter, Ymk, Ypk, Upk, YspM, YspP, Tempos
+        return iter, Ymk, Ypk, Upk, dURot, dUAlpha, YspM, YspP, YmMin, Tempos
     
     def plot_results(self, iter, Ymk, Ypk, Upk, YspM, YspP, Tempos):
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))
