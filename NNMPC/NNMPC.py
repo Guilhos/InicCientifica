@@ -179,7 +179,7 @@ class PINN_MPC():
 
         iter = 130
         for i in range(iter):
-            mMink = self.mMin(ymk[-1])
+            mMink = self.mMin(ypk[-1])
             mMink = np.array(mMink.full())
             self.y_min = np.array([[float(mMink[0][0])], [5.27]])
 
