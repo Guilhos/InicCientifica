@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import casadi as ca
 import time
 from libs.simulationn import Simulation
+from libs.Interpolation import Interpolation
 from CA_Model import CA_Model
 
 class PINN_MPC():
@@ -24,6 +25,9 @@ class PINN_MPC():
         self.sim_pred = Simulation(p,m,steps)
         self.sim_mf = Simulation(1,1,steps)
         self.CAMod = CA_Model("NNMPC/libs/modelo_treinado.pth",p,m,self.nY,self.nU,self.steps)
+        interp = Interpolation('NNMPC/libs/tabela_phi.csv')
+        interp.load_data()
+        self.lut = interp.interpolate()
 
         # Limites das variáveis
         self.u_min = np.array([[0.35], [27e3]])
@@ -65,11 +69,11 @@ class PINN_MPC():
         return ca.DM(matriz)  # Convertendo para CasADi DM
 
     def f_vazaoMin(self):
-        PP = ca.MX.sym('PP', 1)
-        P1 = 4.5
-        x = PP/P1
+        M = ca.MX.sym('M', 1)
+        N = ca.MX.sym('N', 1)
+        x = self.lut(ca.vertcat(N, M))
         f = self.params[0] + self.params[1]*x + self.params[2]*x**2 + self.params[3]*x**3
-        return ca.Function('f_vazaoMin', [PP], [f])
+        return ca.Function('f_vazaoMin', [N,M], [f])
 
     def ajusteMatrizes(self):
         self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1)
@@ -179,7 +183,7 @@ class PINN_MPC():
 
         iter = 130
         for i in range(iter):
-            mMink = self.mMin(ypk[-1])
+            mMink = self.mMin(umk[-1],ypk[-2])
             mMink = np.array(mMink.full())
             self.y_min = np.array([[float(mMink[0][0])], [5.27]])
 

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import casadi as ca
 import time
 from libs.simulationn import Simulation
+from libs.Interpolation import Interpolation
 
 class Only_NMPC():
     def __init__(self, p, m, q, r, steps):
@@ -22,6 +23,9 @@ class Only_NMPC():
         # Objetos
         self.sim_pred = Simulation(p,m,steps)
         self.sim_mf = Simulation(1,1,steps)
+        interp = Interpolation('NNMPC/libs/tabela_phi.csv')
+        interp.load_data()
+        self.lut = interp.interpolate()
 
         # Limites das variáveis
         self.u_min = np.array([[0.35], [27e3]])
@@ -63,11 +67,11 @@ class Only_NMPC():
         return ca.DM(matriz)  # Convertendo para CasADi DM
     
     def f_vazaoMin(self):
-        PP = ca.MX.sym('PP', 1)
-        P1 = 4.5
-        x = PP/P1
+        M = ca.MX.sym('M', 1)
+        N = ca.MX.sym('N', 1)
+        x = self.lut([N, M])
         f = self.params[0] + self.params[1]*x + self.params[2]*x**2 + self.params[3]*x**3
-        return ca.Function('f_vazaoMin', [PP], [f])
+        return ca.Function('f_vazaoMin', [N,M], [f])
 
     def ajusteMatrizes(self):
         self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1) # Expansão do y_min para P. SHAPE -> (nY*P, 1)
@@ -181,7 +185,7 @@ class Only_NMPC():
 
         iter = 130
         for i in range(iter):
-            mMink = self.mMin(ymk[-1])
+            mMink = self.mMin(umk[-1],ypk[-2])
             mMink = np.array(mMink.full())
             self.y_min = np.array([[float(mMink[0][0])], [5.27]])
 
