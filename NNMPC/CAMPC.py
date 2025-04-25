@@ -41,7 +41,7 @@ class Only_NMPC():
                         8.836867650811681e+00]
 
         # Setpoint provisório
-        self.y_sp = np.array([[7.74555396], [6.66187275]])
+        self.y_sp = np.array([[6], [5.92]])
     
     # Ajuste das Matrizes
 
@@ -69,7 +69,7 @@ class Only_NMPC():
     def f_vazaoMin(self):
         M = ca.MX.sym('M', 1)
         N = ca.MX.sym('N', 1)
-        x = self.lut([N, M])
+        x = self.lut(ca.vertcat(N, M))
         f = self.params[0] + self.params[1]*x + self.params[2]*x**2 + self.params[3]*x**3
         return ca.Function('f_vazaoMin', [N,M], [f])
 
@@ -132,7 +132,7 @@ class Only_NMPC():
         opti.solver('ipopt', {
             "ipopt.print_level": 0,
             "ipopt.tol": 1e-6,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
-            "ipopt.max_iter": 500,                   # Reduz número de iterações (ajustável)
+            "ipopt.max_iter": 750,                   # Reduz número de iterações (ajustável)
             "ipopt.mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
             "ipopt.linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
             "ipopt.sb": "yes"
@@ -228,13 +228,13 @@ class Only_NMPC():
             YmMin.append(self.y_min[0])
             
             if i == 10:
-                self.y_sp = np.array([[10.09972032], [6.89841795]])
+                self.y_sp = np.array([[6.5], [6]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             elif i == 50:
-                self.y_sp = np.array([[8.39637471], [6.4025308]])
+                self.y_sp = np.array([[5.5], [5.8]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             elif i == 90:
-                self.y_sp = np.array([[5.67905178], [5.85870524]])
+                self.y_sp = np.array([[5.7], [5.86]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
                 
         #self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)

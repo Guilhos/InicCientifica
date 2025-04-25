@@ -51,7 +51,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Vazão / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(4.5, 12.8)
+    plt.ylim(5, 7.5)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.4),  # Posiciona a legenda abaixo do gráfico
@@ -67,10 +67,11 @@ def superPlot(iter_NN, Ymk_NN,
     plt.plot(x_NN / 2, erro_NN, label="RNN-MPC", color="blue", linewidth=2.5)
     erro_CA = np.array(Ypk_CA)[:, 0] - YmMin_CA.squeeze()
     plt.plot(x_CA / 2, erro_CA, label="NMPC", color="red", linewidth=2.5)
+    plt.axhline(0, color="black", linestyle="--", linewidth=1.5, label="Linha de Surge")
     plt.ylabel("Distância a linha de surge / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(-1, 6)  # Ajuste os limites do eixo Y conforme necessário
+    plt.ylim(-1, 1.5)  # Ajuste os limites do eixo Y conforme necessário
     plt.legend(
         loc='lower center',
         bbox_to_anchor=(0.5, -0.4),  # Posiciona a legenda abaixo do gráfico
@@ -90,7 +91,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Pressão / kPa")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(4.77, 9.83)
+    plt.ylim(5, 7)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.4),  # Posiciona a legenda abaixo do gráfico
@@ -145,7 +146,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.axvline(np.mean(Tempos_CA), color='red', linestyle="--", label="Média NMPC")
     print(f"Média NMPC: {np.mean(Tempos_CA):.2f} s")
     plt.hist(Tempos_NN, bins=26, color='blue', alpha=0.7, edgecolor='black', label ="PIRNN-MPC")
-    plt.axvline(np.mean(Tempos_NN), color='blue', linestyle="--", label="Média PIRNN-MPC")
+    plt.axvline(np.mean(Tempos_NN), color='blue', linestyle="--", label="Média RNN-MPC")
     print(f"Média PIRNN-MPC: {np.mean(Tempos_NN):.2f} s")
     plt.axvline(0.5, color='green', linestyle="--", label="Tempo Amostral")
     plt.axvspan(0, 0.5, color='gray', alpha=0.3, label="Região de Interesse")  # Adiciona a região cinza claro
@@ -166,7 +167,7 @@ p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
 NNMPC = PINN_MPC(p, m, q, r, steps)
 CAMPC = Only_NMPC(p, m, q, r, steps)
 iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN =  NNMPC.run()
-iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA =  iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN
+iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA =  CAMPC.run()
 
 def calcular_ISE(referencia, saida):
     erro = np.array(referencia) - np.array(saida)

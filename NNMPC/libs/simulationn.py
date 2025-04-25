@@ -166,7 +166,9 @@ class Simulation:
     def ySetPoint(self, nSP):
         SPlist = []
         for i in range(nSP):
-            result = fsolve(self.fun, (10, 10), args=(np.random.randint(35,65)/100,np.random.randint(27e3,5e4),self.lut))
+            a = np.random.randint(35,65)/100
+            b = np.random.randint(27e3,5e4)
+            result = fsolve(self.fun, (12.10, 10), args=(a,b,self.lut))
             SPlist.append(result)
         return SPlist
 
@@ -177,13 +179,7 @@ if __name__ == '__main__':
     sim = Simulation(50,3,3)
     y0, u0 = sim.pIniciais()
 
-    yPlanta = sim.pPlanta(y0, dU)
-    print(yPlanta)
-    
-    caPred = sim.ca_YPredFun(y0,dU,[0.5]*3, [38500]*3)
-    
-    print(caPred)
-
+    print(sim.ySetPoint(3))
 
 
 

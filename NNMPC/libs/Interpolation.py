@@ -13,11 +13,11 @@ class Interpolation:
 
     def load_data(self):
         # Simulando leitura de dados (substitua pelo seu CSV real)
-        # self.data = pd.read_csv(self.file_path, decimal=self.decimal)
+        self.data = pd.read_csv(self.file_path, decimal=self.decimal)
         self.N_rot = np.arange(2e4, 6e4, 1e3)  # Shape: (40,)
         self.Mass = np.arange(3, 21.1, 0.1)    # Shape: (181,)
         # Simulando Phi como uma matriz 40x181 (substitua pelos dados reais)
-        self.Phi = np.random.rand(40, 181)  # Exemplo; use self.data.values para dados reais
+        self.Phi = self.data.values   # Exemplo; use self.data.values para dados reais
 
     def interpolate(self):
         phi_flat = self.Phi.ravel(order='F')
@@ -25,39 +25,68 @@ class Interpolation:
         return lut
 
     def plot(self):
-        # Carregar dados e criar interpolante
         self.load_data()
         lut = self.interpolate()
 
-        # Fixar N_rot (usando o valor médio, por exemplo)
-        n_rot_fixed = np.mean(self.N_rot)
+        # Criar malha para N_rot e Mass
+        N_grid, M_grid = np.meshgrid(self.N_rot, self.Mass, indexing='ij')
 
-        # Avaliar a interpolação para todos os valores de Mass
-        phi_values = np.zeros_like(self.Mass)
-        for i, mass in enumerate(self.Mass):
-            phi_values[i] = lut([n_rot_fixed, mass])
+        # Avaliar Phi usando a interpolação
+        Phi_grid = np.zeros_like(N_grid)
+        for i in range(N_grid.shape[0]):
+            for j in range(N_grid.shape[1]):
+                Phi_grid[i, j] = lut([N_grid[i, j], M_grid[i, j]])
 
-        # Plotar Mass vs Phi (interpolação)
-        plt.figure(figsize=(8, 6))
-        plt.plot(self.Mass, phi_values, 'b-', label='Phi Interpolado')
+        # Calcular a superfície polinomial sobre Phi interpolado
+        a0, a1, a2, a3 = self.params
+        Poly_grid = a0 + a1 * Phi_grid + a2 * Phi_grid**2 + a3 * Phi_grid**3
 
-        # Plotar a curva polinomial
-        phi_range = np.linspace(np.min(phi_values), np.max(phi_values), 181)
-        poly = (self.params[0] + self.params[1] * phi_range +
-                self.params[2] * phi_range**2 + self.params[3] * phi_range**3)
-        plt.plot(self.Mass, poly, 'r--', label='Curva Polinomial')
+        # Máscara para manter apenas valores com Phi > 0
+        mask = Phi_grid > 0
+        N_masked = np.where(mask, N_grid, np.nan)
+        M_masked = np.where(mask, M_grid, np.nan)
+        Phi_masked = np.where(mask, Phi_grid, np.nan)
+        Poly_masked = np.where(mask, Poly_grid, np.nan)
 
-        # Configurações do gráfico
-        plt.xlabel('Mass')
-        plt.ylabel('Phi')
-        plt.title('Phi Interpolado e Curva Polinomial vs Mass')
-        plt.legend()
-        plt.grid(True)
+        # Identificar cruzamento aproximado: onde |Phi - Poly(Phi)| < tolerância
+        diff = np.abs(Phi_grid - Poly_grid)
+        tolerance = 1e-2
+        cross_mask = (diff < tolerance) & mask
+        N_cross = N_grid[cross_mask]
+        M_cross = M_grid[cross_mask]
+        Z_cross = Phi_grid[cross_mask]  # ou Poly_grid[cross_mask], são semelhantes
+        
+        # Printar os valores da linha de cruzamento
+        print("=== Linha de Cruzamento (Phi ≈ Poly(Phi)) ===")
+        for n, m, z in zip(N_cross, M_cross, Z_cross):
+            print(f"N_rot: {n:.2f}, Mass: {m:.2f}, Phi: {z:.6f}")
+
+        # Criar figura 3D
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Superfície interpolada (Phi)
+        ax.plot_surface(N_masked, M_masked, Phi_masked, cmap='viridis', alpha=0.7)
+
+        # Superfície polinomial
+        ax.plot_surface(N_masked, M_masked, Poly_masked, cmap='plasma', alpha=0.5)
+
+        # Linha de cruzamento
+        ax.plot(N_cross, M_cross, Z_cross, 'r-', linewidth=2, label='Cruzamento Phi = Poly(Phi)')
+
+        # Rótulos
+        ax.set_xlabel('N_rot')
+        ax.set_ylabel('Mass')
+        ax.set_zlabel('Phi / Polinômio')
+        ax.set_title('Phi Interpolado vs Polinômio (Phi > 0)')
+        ax.legend()
+
+        plt.tight_layout()
         plt.show()
 
 if __name__ == "__main__":
     # Executar
-    interp = Interpolation('dummy_path.csv')
+    interp = Interpolation('NNMPC/libs/tabela_phi.csv')
     interp.plot()   
 
     
