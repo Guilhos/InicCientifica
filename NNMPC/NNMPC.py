@@ -37,13 +37,10 @@ class PINN_MPC():
         self.y_min = np.array([[3.5], [5.27]])
         self.y_max = np.array([[12.3], [9.3]])
 
-        self.params = [-4.117976349902422e+01,
-                        7.819497805337005e+01,
-                        -4.406691928857834e+01,
-                        8.836867650811681e+00]
+        self.params = [-25.0181, 42.0452, -17.9068, 3.0313]
 
         # Setpoint provisório
-        self.y_sp = np.array([[6], [5.92]])
+        self.y_sp = np.array([[8.5],[6.9]])
     
     # Ajuste das Matrizes
 
@@ -70,10 +67,9 @@ class PINN_MPC():
 
     def f_vazaoMin(self):
         M = ca.MX.sym('M', 1)
-        N = ca.MX.sym('N', 1)
-        x = self.lut(ca.vertcat(N, M))
+        x = ca.MX.sym('x', 1)
         f = self.params[0] + self.params[1]*x + self.params[2]*x**2 + self.params[3]*x**3
-        return ca.Function('f_vazaoMin', [N,M], [f])
+        return ca.Function('f_vazaoMin', [x,M], [f])
 
     def ajusteMatrizes(self):
         self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1)
@@ -163,7 +159,8 @@ class PINN_MPC():
     def run(self):
         self.ajusteMatrizes()
         xmk = []
-        ymk, umk = self.sim_pred.pIniciais() # Recebe os pontos iniciais, ymk [6,1] umk [6,1]
+        ymk = np.tile(np.array([[8.5], [6.9]]), (self.steps, 1))
+        umk = np.tile(np.array([[0.5], [385e2]]), (self.steps, 1))
         ypk = ymk[-self.nY:]
         ymk_next = ypk
         self.opti_nlp = self.nlp_func()
@@ -178,12 +175,14 @@ class PINN_MPC():
         YspP = []
         YmMin = []
         Tempos = []
+        phi = []
         #Ymink = []
         #Ymaxk = []
 
         iter = 130
         for i in range(iter):
-            mMink = self.mMin(umk[-1],ypk[-2])
+            x = self.lut(ca.vertcat(umk[-1],ypk[-2]))
+            mMink = self.mMin(x,ypk[-2])
             mMink = np.array(mMink.full())
             self.y_min = np.array([[float(mMink[0][0])], [5.27]])
 
@@ -226,20 +225,21 @@ class PINN_MPC():
             YspM.append(self.y_sp[0])
             YspP.append(self.y_sp[1])
             YmMin.append(self.y_min[0])
+            phi.append(x)
 
             if i == 10:
-                self.y_sp = np.array([[6.5], [6]])
+                self.y_sp = np.array([[7], [6]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             elif i == 50:
-                self.y_sp = np.array([[5.5], [5.8]])
+                self.y_sp = np.array([[9], [7.05]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             elif i == 90:
-                self.y_sp = np.array([[5.7], [5.86]])
+                self.y_sp = np.array([[8], [6.6]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             
         #self.plot_results(iter, Ymk, Ypk, Upk, YspM, YspP, Tempos)
         
-        return iter, Ymk, Ypk, Upk, dURot, dUAlpha, YspM, YspP, YmMin, Tempos
+        return iter, Ymk, Ypk, Upk, dURot, dUAlpha, YspM, YspP, YmMin, Tempos, phi
     
     def plot_results(self, iter, Ymk, Ypk, Upk, YspM, YspP, Tempos):
         fig, axes = plt.subplots(3, 2, figsize=(12, 8))

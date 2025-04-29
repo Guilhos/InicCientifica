@@ -1,5 +1,6 @@
 from CAMPC import Only_NMPC
 from NNMPC import PINN_MPC
+from libs.Interpolation import Interpolation
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -38,7 +39,7 @@ def superPlot(iter_NN, Ymk_NN,
     def configurar_legenda():
         plt.legend(
             loc='lower center',
-            bbox_to_anchor=(0.5, -0.4),  # Posiciona a legenda abaixo do gráfico
+            bbox_to_anchor=(0.5, -0.45),  # Posiciona a legenda abaixo do gráfico
             ncol=3,
             frameon=False
         )
@@ -46,12 +47,13 @@ def superPlot(iter_NN, Ymk_NN,
     # Vazão x Tempo
     plt.figure(figsize=(20,9))
     plt.plot(x_NN / 2, np.array(Ypk_NN)[:, 0], label="RNN-MPC", color="blue", linewidth=2.5)
-    plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 0], label = "NMPC", color="red", linewidth=2.5)
-    plt.plot(x_NN / 2, YspM_NN.squeeze(), linestyle="--", color="red", label="Set Point", linewidth=2.5)
+    plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 0], linestyle="--", label = "NMPC", color="red", linewidth=2.5)
+    plt.plot(x_NN / 2, YspM_NN.squeeze(), linestyle="-.", color="gray", label="Set Point", linewidth=2.5)
+    #plt.plot(x_NN / 2, YmMin_NN, linestyle="--", color="black", linewidth=2.5)
     plt.ylabel("Vazão / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(5, 7.5)
+    plt.ylim(4.5, 12.8)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.4),  # Posiciona a legenda abaixo do gráfico
@@ -66,8 +68,8 @@ def superPlot(iter_NN, Ymk_NN,
     erro_NN = np.array(Ypk_NN)[:, 0] - YmMin_NN.squeeze()
     plt.plot(x_NN / 2, erro_NN, label="RNN-MPC", color="blue", linewidth=2.5)
     erro_CA = np.array(Ypk_CA)[:, 0] - YmMin_CA.squeeze()
-    plt.plot(x_CA / 2, erro_CA, label="NMPC", color="red", linewidth=2.5)
-    plt.axhline(0, color="black", linestyle="--", linewidth=1.5, label="Linha de Surge")
+    plt.plot(x_CA / 2, erro_CA, linestyle="--", label="NMPC", color="red", linewidth=2.5)
+    plt.axhline(0, color="black", linestyle="-.", linewidth=1.5, label="Linha de Surge")
     plt.ylabel("Distância a linha de surge / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
@@ -84,14 +86,14 @@ def superPlot(iter_NN, Ymk_NN,
     # Pressão x Tempo
     plt.figure(figsize=(20,9))
     plt.plot(x_NN / 2, np.array(Ypk_NN)[:, 1], label="RNN-MPC", color="blue", linewidth=2.5)
-    plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 1], label="NMPC", color="red", linewidth=2.5)
-    plt.plot(x_NN / 2, YspP_NN.squeeze(), linestyle="--", color="red", label="Set Point", linewidth=2.5)
+    plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 1], linestyle="--", label="NMPC", color="red", linewidth=2.5)
+    plt.plot(x_NN / 2, YspP_NN.squeeze(), linestyle="-.", color="gray", label="Set Point", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [5.27, 5.27], linestyle="-.", color="black", label="Restrições de Contorno", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [9.3, 9.3], linestyle="-.", color="black", linewidth=2.5)
     plt.ylabel("Pressão / kPa")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(5, 7)
+    plt.ylim(4.77, 9.8)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.4),  # Posiciona a legenda abaixo do gráfico
@@ -104,7 +106,7 @@ def superPlot(iter_NN, Ymk_NN,
     # Abertura da Válvula x Tempo
     plt.figure(figsize=(20,9))
     plt.plot(x_NN / 2, np.array(Upk_NN)[:, 0], label="RNN-MPC", color="blue", linewidth=2.5)
-    plt.plot(x_CA / 2, np.array(Upk_CA)[:, 0], label="NMPC", color="red", linewidth=2.5)
+    plt.plot(x_CA / 2, np.array(Upk_CA)[:, 0], linestyle="--", label="NMPC", color="red", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [0.35, 0.35], linestyle="-.", color="black", label="Restrições de Contorno", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [0.65, 0.65], linestyle="-.", color="black", linewidth=2.5)
     plt.ylabel("Alpha / %")
@@ -125,7 +127,7 @@ def superPlot(iter_NN, Ymk_NN,
     # Velocidade de Rotação x Tempo
     plt.figure(figsize=(20,9))
     plt.plot(x_NN / 2, np.array(Upk_NN)[:, 1] // 60, label="RNN-MPC", color="blue", linewidth=2.5)
-    plt.plot(x_CA / 2, np.array(Upk_CA)[:, 1] // 60, label="NMPC", color="red", linewidth=2.5)
+    plt.plot(x_CA / 2, np.array(Upk_CA)[:, 1] // 60, linestyle="--", label="NMPC", color="red", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [27e3 // 60, 27e3 // 60], linestyle="-.", color="black", label="Restrições de Contorno", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [5e4 // 60, 5e4 // 60], linestyle="-.", color="black", linewidth=2.5)
     plt.ylabel("N / Hz")
@@ -163,11 +165,13 @@ qPressao = 0.1/9.30146217346191406250**2
 rAlpha = 0/0.15**2
 rN = 1e-4/5000**2
 
+interp = Interpolation('NNMPC/libs/tabela_phi.csv')
+
 p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
 NNMPC = PINN_MPC(p, m, q, r, steps)
 CAMPC = Only_NMPC(p, m, q, r, steps)
-iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN =  NNMPC.run()
-iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA =  CAMPC.run()
+iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN, PHI_NN =  NNMPC.run()
+iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA, PHI_CA = CAMPC.run()
 
 def calcular_ISE(referencia, saida):
     erro = np.array(referencia) - np.array(saida)
@@ -203,3 +207,9 @@ superPlot(iter_NN, Ymk_NN,
           Ymk_CA, Ypk_CA,
           Upk_CA, YspM_CA,
           YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDNV)
+
+phi1 = np.array(PHI_NN)
+mass1 = np.array(Ypk_NN)[:, 0]
+phi2 = np.array(PHI_CA)
+mass2 = np.array(Ypk_CA)[:, 0]
+interp.plot_with_trajectories(phi1=phi1, mass1=mass1, phi2=phi2, mass2=mass2)

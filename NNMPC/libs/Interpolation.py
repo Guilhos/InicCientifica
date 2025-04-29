@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 import casadi as ca
 import matplotlib.pyplot as plt
+import os
 from mpl_toolkits.mplot3d import Axes3D
 
 class Interpolation:
     def __init__(self, file_path, decimal=','):
         self.file_path = file_path
         self.decimal = decimal
-        self.params = [-4.117976349902422e+01, 7.819497805337005e+01,
-                       -4.406691928857834e+01, 8.836867650811681e+00]
+        self.params = [-25.0181, 42.0452, -17.9068, 3.0313]
 
     def load_data(self):
         # Simulando leitura de dados (substitua pelo seu CSV real)
@@ -25,65 +25,123 @@ class Interpolation:
         return lut
 
     def plot(self):
+        images_path = os.path.join("NNMPC", "images")
+        os.makedirs(images_path, exist_ok=True)
+        
         self.load_data()
         lut = self.interpolate()
 
-        # Criar malha para N_rot e Mass
+        # Malhas de N_rot e Mass
         N_grid, M_grid = np.meshgrid(self.N_rot, self.Mass, indexing='ij')
 
-        # Avaliar Phi usando a interpolação
+        # Calcular Phi
         Phi_grid = np.zeros_like(N_grid)
         for i in range(N_grid.shape[0]):
             for j in range(N_grid.shape[1]):
                 Phi_grid[i, j] = lut([N_grid[i, j], M_grid[i, j]])
 
-        # Calcular a superfície polinomial sobre Phi interpolado
-        a0, a1, a2, a3 = self.params
-        Poly_grid = a0 + a1 * Phi_grid + a2 * Phi_grid**2 + a3 * Phi_grid**3
-
-        # Máscara para manter apenas valores com Phi > 0
+        # Aplicar máscara: Phi > 0
         mask = Phi_grid > 0
-        N_masked = np.where(mask, N_grid, np.nan)
-        M_masked = np.where(mask, M_grid, np.nan)
         Phi_masked = np.where(mask, Phi_grid, np.nan)
-        Poly_masked = np.where(mask, Poly_grid, np.nan)
+        N_masked = np.where(mask, N_grid, np.nan)
 
-        # Identificar cruzamento aproximado: onde |Phi - Poly(Phi)| < tolerância
-        diff = np.abs(Phi_grid - Poly_grid)
-        tolerance = 1e-2
-        cross_mask = (diff < tolerance) & mask
-        N_cross = N_grid[cross_mask]
-        M_cross = M_grid[cross_mask]
-        Z_cross = Phi_grid[cross_mask]  # ou Poly_grid[cross_mask], são semelhantes
-        
-        # Printar os valores da linha de cruzamento
-        print("=== Linha de Cruzamento (Phi ≈ Poly(Phi)) ===")
-        for n, m, z in zip(N_cross, M_cross, Z_cross):
-            print(f"N_rot: {n:.2f}, Mass: {m:.2f}, Phi: {z:.6f}")
+        # Interpolação para plot: eixo X = Mass, eixo Y = Phi, contorno = N_rot
+        from scipy.interpolate import griddata
 
-        # Criar figura 3D
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(111, projection='3d')
+        M_valid = M_grid[mask]
+        Phi_valid = Phi_masked[mask]
+        N_valid = N_masked[mask]
 
-        # Superfície interpolada (Phi)
-        ax.plot_surface(N_masked, M_masked, Phi_masked, cmap='viridis', alpha=0.7)
+        mass_range = np.linspace(self.Mass.min(), self.Mass.max(), 200)
+        phi_range = np.linspace(1, np.nanmax(Phi_valid), 200)
+        M_mesh, Phi_mesh = np.meshgrid(mass_range, phi_range)
+        N_interp = griddata((M_valid, Phi_valid), N_valid, (M_mesh, Phi_mesh), method='linear')
 
-        # Superfície polinomial
-        ax.plot_surface(N_masked, M_masked, Poly_masked, cmap='plasma', alpha=0.5)
+        # Calcular polinômio para a curva
+        a0, a1, a2, a3 = self.params
+        phi_curve = np.linspace(1.1, 2.3, 500)
+        poly_curve = a0 + a1 * phi_curve + a2 * phi_curve**2 + a3 * phi_curve**3
 
-        # Linha de cruzamento
-        ax.plot(N_cross, M_cross, Z_cross, 'r-', linewidth=2, label='Cruzamento Phi = Poly(Phi)')
+        # Plotar
+        fig, ax = plt.subplots(figsize=(10, 8))
+        CS = ax.contour(M_mesh, Phi_mesh, N_interp, levels=20, colors='black')
+        ax.clabel(CS, inline=True, fontsize=8, fmt="%.0f")
 
-        # Rótulos
-        ax.set_xlabel('N_rot')
-        ax.set_ylabel('Mass')
-        ax.set_zlabel('Phi / Polinômio')
-        ax.set_title('Phi Interpolado vs Polinômio (Phi > 0)')
+        # Plotar curva do polinômio
+        ax.plot(poly_curve, phi_curve, 'r-', linewidth=2, label='Polinômio aplicado a Φ')
+
+        ax.set_xlabel('Mass')
+        ax.set_ylabel('Phi')
+        ax.set_title('Curvas de Nível de N_rot e Curva Polinomial sobre Φ')
         ax.legend()
-
         plt.tight_layout()
+        plt.savefig(os.path.join(images_path, "interpolation.png"))
         plt.show()
+        
+    def plot_with_trajectories(self, phi1=None, mass1=None, phi2=None, mass2=None):
+        images_path = os.path.join("NNMPC", "images")
+        os.makedirs(images_path, exist_ok=True)
+        
+        self.load_data()
+        lut = self.interpolate()
 
+        # Malhas de N_rot e Mass
+        N_grid, M_grid = np.meshgrid(self.N_rot, self.Mass, indexing='ij')
+
+        # Calcular Phi
+        Phi_grid = np.zeros_like(N_grid)
+        for i in range(N_grid.shape[0]):
+            for j in range(N_grid.shape[1]):
+                Phi_grid[i, j] = lut([N_grid[i, j], M_grid[i, j]])
+
+        # Aplicar máscara: Phi > 0
+        mask = Phi_grid > 0
+        Phi_masked = np.where(mask, Phi_grid, np.nan)
+        N_masked = np.where(mask, N_grid, np.nan)
+
+        from scipy.interpolate import griddata
+
+        M_valid = M_grid[mask]
+        Phi_valid = Phi_masked[mask]
+        N_valid = N_masked[mask]
+
+        mass_range = np.linspace(self.Mass.min(), self.Mass.max(), 200)
+        phi_range = np.linspace(1, np.nanmax(Phi_valid), 200)
+        M_mesh, Phi_mesh = np.meshgrid(mass_range, phi_range)
+        N_interp = griddata((M_valid, Phi_valid), N_valid, (M_mesh, Phi_mesh), method='linear')
+
+        # Curva polinomial
+        a0, a1, a2, a3 = self.params
+        phi_curve = np.linspace(1.1, 2.3, 500)
+        poly_curve = a0 + a1 * phi_curve + a2 * phi_curve**2 + a3 * phi_curve**3
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(16, 9))
+        ax.contour(M_mesh, Phi_mesh, N_interp, levels=20, colors='black')
+
+        ax.plot(poly_curve, phi_curve, color='gray', linestyle='-', linewidth=2, label='Restrição de surge')
+
+        # Trajetória 1 (se fornecida)
+        if phi1 is not None and mass1 is not None:
+            ax.plot(np.ravel(mass1), np.ravel(phi1), 'bo--', linewidth=2, markersize=4, label='RNN-MPC')
+
+        # Trajetória 2 (se fornecida)
+        if phi2 is not None and mass2 is not None:
+            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', linewidth=2, markersize=4, label='NNMPC')
+
+        ax.set_xlabel('Vazão / kg/s')
+        ax.set_ylabel('Φ')
+        ax.legend(
+            loc='lower center',
+            bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
+            ncol=3,
+            frameon=False
+        )
+        ax.set_ylim(1.2, 1.8)
+        ax.set_xlim(6,11)
+        plt.tight_layout()
+        plt.savefig(os.path.join(images_path, "interpolation_with_trajectories.png"))
+    
 if __name__ == "__main__":
     # Executar
     interp = Interpolation('NNMPC/libs/tabela_phi.csv')
