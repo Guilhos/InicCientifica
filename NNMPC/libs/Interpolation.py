@@ -79,6 +79,15 @@ class Interpolation:
         plt.show()
         
     def plot_with_trajectories(self, phi1=None, mass1=None, phi2=None, mass2=None):
+        plt.rcParams.update({
+        'font.size': 28,  # Aumenta o tamanho da fonte geral
+        'axes.titlesize': 28,  # Tamanho do título dos eixos
+        'axes.labelsize': 28,  # Tamanho dos rótulos dos eixos
+        'xtick.labelsize': 28,  # Tamanho dos rótulos do eixo X
+        'ytick.labelsize': 28,  # Tamanho dos rótulos do eixo Y
+        'legend.fontsize': 28,  # Tamanho da fonte da legenda
+        })
+
         images_path = os.path.join("NNMPC", "images")
         os.makedirs(images_path, exist_ok=True)
         
@@ -117,17 +126,17 @@ class Interpolation:
 
         # Plot
         fig, ax = plt.subplots(figsize=(16, 9))
-        ax.contour(M_mesh, Phi_mesh, N_interp, levels=20, colors='black')
+        ax.contour(M_mesh, Phi_mesh, N_interp, levels=20, colors='black', linewidth=2.5)
 
-        ax.plot(poly_curve, phi_curve, color='gray', linestyle='-', linewidth=2, label='Restrição de surge')
+        ax.plot(poly_curve, phi_curve, color='gray', linestyle='-', linewidth=2, label='Restrição de surge', linewidth=2.5)
 
         # Trajetória 1 (se fornecida)
         if phi1 is not None and mass1 is not None:
-            ax.plot(np.ravel(mass1), np.ravel(phi1), 'bo--', linewidth=2, markersize=4, label='RNN-MPC')
+            ax.plot(np.ravel(mass1), np.ravel(phi1), 'bo--', linewidth=2, markersize=4, label='RNN-MPC', linewidth=2.5)
 
         # Trajetória 2 (se fornecida)
         if phi2 is not None and mass2 is not None:
-            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', linewidth=2, markersize=4, label='NNMPC')
+            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', linewidth=2, markersize=4, label='NNMPC', linewidth=2.5)
 
         ax.set_xlabel('Vazão / kg/s')
         ax.set_ylabel('Φ')
@@ -139,6 +148,7 @@ class Interpolation:
         )
         ax.set_ylim(1.2, 1.8)
         ax.set_xlim(6,11)
+        plt.subplots_adjust(top=0.92, bottom=0.25, wspace=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(images_path, "interpolation_with_trajectories.png"))
     
