@@ -1,5 +1,3 @@
-from CAMPC import Only_NMPC
-from NNMPC import PINN_MPC
 from libs.Interpolation import Interpolation
 import numpy as np
 import matplotlib.pyplot as plt
