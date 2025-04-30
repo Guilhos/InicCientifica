@@ -45,7 +45,7 @@ def superPlot(iter_NN, Ymk_NN,
         )
 
     # Vazão x Tempo
-    plt.figure(figsize=(20,9))
+    plt.figure(figsize=(16,9), dpi=300)
     plt.plot(x_NN / 2, np.array(Ypk_NN)[:, 0], label="RNN-MPC", color="blue", linewidth=2.5)
     plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 0], linestyle="--", label = "NMPC", color="red", linewidth=2.5)
     plt.plot(x_NN / 2, YspM_NN.squeeze(), linestyle="-.", color="black", label="Set Point", linewidth=2.5)
@@ -64,12 +64,12 @@ def superPlot(iter_NN, Ymk_NN,
     plt.savefig(os.path.join(images_path, "vazao_tempo_subplot.png"))
     
     # ESL (Erro entre o ponto da planta e o Limite Inferior)
-    plt.figure(figsize=(20, 9))
+    plt.figure(figsize=(16, 9), dpi=300)
     erro_NN = np.array(Ypk_NN)[:, 0] - YmMin_NN.squeeze()
     plt.plot(x_NN / 2, erro_NN, label="RNN-MPC", color="blue", linewidth=2.5)
     erro_CA = np.array(Ypk_CA)[:, 0] - YmMin_CA.squeeze()
     plt.plot(x_CA / 2, erro_CA, linestyle="--", label="NMPC", color="red", linewidth=2.5)
-    plt.axhline(0, color="black", linestyle="-.", linewidth=1.5, label="Linha de Surge", linewidth=2.5)
+    plt.axhline(0, color="black", linestyle="-.", label="Linha de Surge", linewidth=2.5)
     plt.ylabel("Distância a linha de surge / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
@@ -84,7 +84,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.savefig(os.path.join(images_path, "vazao_error_subplot.png"))
 
     # Pressão x Tempo
-    plt.figure(figsize=(20,9))
+    plt.figure(figsize=(16,9), dpi=300)
     plt.plot(x_NN / 2, np.array(Ypk_NN)[:, 1], label="RNN-MPC", color="blue", linewidth=2.5)
     plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 1], linestyle="--", label="NMPC", color="red", linewidth=2.5)
     plt.plot(x_NN / 2, YspP_NN.squeeze(), linestyle="-.", color="black", label="Set Point", linewidth=2.5)
@@ -102,7 +102,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.savefig(os.path.join(images_path, "pressao_tempo_subplot.png"))
 
     # Abertura da Válvula x Tempo
-    plt.figure(figsize=(20,9))
+    plt.figure(figsize=(16,9), dpi=300)
     plt.plot(x_NN / 2, np.array(Upk_NN)[:, 0], label="RNN-MPC", color="blue", linewidth=2.5)
     plt.plot(x_CA / 2, np.array(Upk_CA)[:, 0], linestyle="--", label="NMPC", color="red", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [0.35, 0.35], linestyle="-.", color="black", label="Restrições de Contorno", linewidth=2.5)
@@ -123,7 +123,7 @@ def superPlot(iter_NN, Ymk_NN,
     fig, axs = plt.subplots(1, 2, figsize=(32,9), sharey=True)
 
     # Velocidade de Rotação x Tempo
-    plt.figure(figsize=(20,9))
+    plt.figure(figsize=(16,9), dpi=300)
     plt.plot(x_NN / 2, np.array(Upk_NN)[:, 1] // 60, label="RNN-MPC", color="blue", linewidth=2.5)
     plt.plot(x_CA / 2, np.array(Upk_CA)[:, 1] // 60, linestyle="--", label="NMPC", color="red", linewidth=2.5)
     plt.plot([0, iter_NN / 2], [27e3 // 60, 27e3 // 60], linestyle="-.", color="black", label="Restrições de Contorno", linewidth=2.5)
@@ -141,14 +141,14 @@ def superPlot(iter_NN, Ymk_NN,
     plt.savefig(os.path.join(images_path, "velocidade_rotacao_tempo_subplot.png"))
 
     # Histograma das Frequências de Tempo
-    plt.figure(figsize=(20,9))
+    plt.figure(figsize=(16,9), dpi=300)
     plt.hist(Tempos_CA, bins=26, color='red', alpha=0.7, edgecolor='black', label="NMPC")
-    plt.axvline(np.mean(Tempos_CA), color='red', linestyle="--", label="Média NMPC")
+    plt.axvline(np.mean(Tempos_CA), color='red', linestyle="--", label="Média NMPC", linewidth=2.5)
     print(f"Média NMPC: {np.mean(Tempos_CA):.2f} s")
     plt.hist(Tempos_NN, bins=26, color='blue', alpha=0.7, edgecolor='black', label ="PIRNN-MPC")
-    plt.axvline(np.mean(Tempos_NN), color='blue', linestyle="--", label="Média RNN-MPC")
+    plt.axvline(np.mean(Tempos_NN), color='blue', linestyle="--", label="Média RNN-MPC", linewidth=2.5)
     print(f"Média PIRNN-MPC: {np.mean(Tempos_NN):.2f} s")
-    plt.axvline(0.5, color='green', linestyle="--", label="Tempo Amostral")
+    plt.axvline(0.5, color='green', linestyle="--", label="Tempo Amostral", linewidth=2.5)
     plt.axvspan(0, 0.5, color='black', alpha=0.3, label="Região de Interesse")  # Adiciona a região cinza claro
     plt.xlabel("Tempo / s")
     plt.ylabel("Frequência")
@@ -183,6 +183,7 @@ ISE_CA_P = calcular_ISE(YspP_CA, np.array(Ypk_CA)[:, 1])
 
 ISE = [ISE_NN_M, ISE_NN_P, ISE_CA_M, ISE_CA_P]
 print(f"ISE_NN_M: {ISE_NN_M:.2f}\n ISE_NN_P: {ISE_NN_P:.2f}\n ISE_CA_M: {ISE_CA_M:.2f}\n ISE_CA_P: {ISE_CA_P:.2f}")
+print
 
 def calcular_ISDNV(sinal_controle):
     sinal_controle = np.array(sinal_controle).flatten()
@@ -197,6 +198,15 @@ ISDNV_NN_P = calcular_ISDNV(dURot_NN)
 
 ISDNV = [ISDNV_NN_M, ISDNV_NN_P, ISDNV_CA_M, ISDNV_CA_P]
 print(f"ISDNV_NN_M: {ISDNV_NN_M:.2f}\n ISDNV_NN_P: {ISDNV_NN_P:.2f}\n ISDNV_CA_M: {ISDNV_CA_M:.2f}\n ISDNV_CA_P: {ISDNV_CA_P:.2f}")
+
+print(f'ISE - Vazão & ${ISE_NN_M:.2f}$ & ${ISE_CA_M:.2f}$ & {((ISE_CA_M - ISE_NN_M)/ISE_CA_M)*100:.2f}%% \\\\ \n'
+      f'ISE - Pressão & ${ISE_NN_P:.2f}$ & ${ISE_CA_P:.2f}$ & {((ISE_CA_P - ISE_NN_P)/ISE_CA_P)*100:.2f}%% \\\\ \n'
+      f'ISDNV - Válvula & ${ISDNV_NN_M:.2f}$ & ${ISDNV_CA_M:.2f}$ & {((ISDNV_CA_M - ISDNV_NN_M)/ISDNV_CA_M)*100:.2f}%% \\\\ \n'
+      f'ISDNV - Vel. Rotação & ${ISDNV_NN_P:.2f}$ & ${ISDNV_CA_P:.2f}$ & {((ISDNV_CA_P - ISDNV_NN_P)/ISDNV_CA_P)*100:.2f}%% \\\\')
+
+print(f'Tempo Médio - RNN-MPC: {np.mean(Tempos_NN):.2f} s\n'
+      f'Tempo Médio - NMPC: {np.mean(Tempos_CA):.2f} s\n'
+      f'Variação de Tempo: {(np.mean(Tempos_CA)/np.mean(Tempos_NN)):.2f} vezes mais rápido\n')
 
 superPlot(iter_NN, Ymk_NN,
           Ypk_NN, Upk_NN,

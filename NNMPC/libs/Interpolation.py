@@ -125,18 +125,18 @@ class Interpolation:
         poly_curve = a0 + a1 * phi_curve + a2 * phi_curve**2 + a3 * phi_curve**3
 
         # Plot
-        fig, ax = plt.subplots(figsize=(16, 9))
+        fig, ax = plt.subplots(figsize=(16, 9), dpi=300)
         ax.contour(M_mesh, Phi_mesh, N_interp, levels=20, colors='black', linewidth=2.5)
 
-        ax.plot(poly_curve, phi_curve, color='gray', linestyle='-', linewidth=2, label='Restrição de surge', linewidth=2.5)
+        ax.plot(poly_curve, phi_curve, color='gray', linestyle='-', label='Restrição de surge', linewidth=2.5)
 
         # Trajetória 1 (se fornecida)
         if phi1 is not None and mass1 is not None:
-            ax.plot(np.ravel(mass1), np.ravel(phi1), 'bo--', linewidth=2, markersize=4, label='RNN-MPC', linewidth=2.5)
+            ax.plot(np.ravel(mass1), np.ravel(phi1), 'bo--', markersize=4, label='RNN-MPC', linewidth=2.5)
 
         # Trajetória 2 (se fornecida)
         if phi2 is not None and mass2 is not None:
-            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', linewidth=2, markersize=4, label='NNMPC', linewidth=2.5)
+            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', markersize=4, label='NNMPC', linewidth=2.5)
 
         ax.set_xlabel('Vazão / kg/s')
         ax.set_ylabel('Φ')
