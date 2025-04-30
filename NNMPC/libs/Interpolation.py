@@ -3,7 +3,6 @@ import pandas as pd
 import casadi as ca
 import matplotlib.pyplot as plt
 import os
-from mpl_toolkits.mplot3d import Axes3D
 
 class Interpolation:
     def __init__(self, file_path, decimal=','):
@@ -80,12 +79,12 @@ class Interpolation:
         
     def plot_with_trajectories(self, phi1=None, mass1=None, phi2=None, mass2=None):
         plt.rcParams.update({
-        'font.size': 28,  # Aumenta o tamanho da fonte geral
-        'axes.titlesize': 28,  # Tamanho do título dos eixos
-        'axes.labelsize': 28,  # Tamanho dos rótulos dos eixos
-        'xtick.labelsize': 28,  # Tamanho dos rótulos do eixo X
-        'ytick.labelsize': 28,  # Tamanho dos rótulos do eixo Y
-        'legend.fontsize': 28,  # Tamanho da fonte da legenda
+        'font.size': 32,  # Aumenta o tamanho da fonte geral
+        'axes.titlesize': 32,  # Tamanho do título dos eixos
+        'axes.labelsize': 32,  # Tamanho dos rótulos dos eixos
+        'xtick.labelsize': 32,  # Tamanho dos rótulos do eixo X
+        'ytick.labelsize': 32,  # Tamanho dos rótulos do eixo Y
+        'legend.fontsize': 32,  # Tamanho da fonte da legenda
         })
 
         images_path = os.path.join("NNMPC", "images")
@@ -125,10 +124,8 @@ class Interpolation:
         poly_curve = a0 + a1 * phi_curve + a2 * phi_curve**2 + a3 * phi_curve**3
 
         # Plot
-        fig, ax = plt.subplots(figsize=(16, 9), dpi=300)
-        ax.contour(M_mesh, Phi_mesh, N_interp, levels=20, colors='black', linewidth=2.5)
-
-        ax.plot(poly_curve, phi_curve, color='gray', linestyle='-', label='Restrição de surge', linewidth=2.5)
+        fig, ax = plt.subplots(figsize=(16, 9), dpi=400)
+        ax.contour(M_mesh, Phi_mesh, N_interp, levels=10, colors='black')
 
         # Trajetória 1 (se fornecida)
         if phi1 is not None and mass1 is not None:
@@ -136,7 +133,10 @@ class Interpolation:
 
         # Trajetória 2 (se fornecida)
         if phi2 is not None and mass2 is not None:
-            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', markersize=4, label='NNMPC', linewidth=2.5)
+            ax.plot(np.ravel(mass2), np.ravel(phi2), 'rs--', markersize=4, label='NMPC', linewidth=2.5)
+            
+        
+        ax.plot(poly_curve, phi_curve, color='black', linestyle='-.', label='Restrição de Surge', linewidth=2.5)
 
         ax.set_xlabel('Vazão / kg/s')
         ax.set_ylabel('Φ')
