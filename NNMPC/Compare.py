@@ -10,7 +10,7 @@ def superPlot(iter_NN, Ymk_NN,
               Tempos_NN, iter_CA,
               Ymk_CA, Ypk_CA,
               Upk_CA, YspM_CA,
-              YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDNV):
+              YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDMV):
     
     images_path = os.path.join("NNMPC", "images")
     os.makedirs(images_path, exist_ok=True)
@@ -52,7 +52,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Vazão / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(4.5, 12.8)
+    plt.ylim(6, 11)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
@@ -87,10 +87,10 @@ def superPlot(iter_NN, Ymk_NN,
     plt.plot(x_NN / 2, np.array(Ypk_NN)[:, 1], label="RNN-MPC", color="blue", linewidth=2.5)
     plt.plot(x_CA / 2, np.array(Ypk_CA)[:, 1], linestyle="-", label="NMPC", color="red", linewidth=2.5)
     plt.plot(x_NN / 2, YspP_NN.squeeze(), linestyle="-.", color="black", label="Set Point", linewidth=2.5)
-    plt.ylabel("Pressão / kPa")
+    plt.ylabel("Pressão / MPa")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(4.77, 9.8)
+    plt.ylim(5.5, 8)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
@@ -157,11 +157,10 @@ def superPlot(iter_NN, Ymk_NN,
     plt.savefig(os.path.join(images_path, "histograma_frequencias_tempo.png"))
     plt.close()
     
-def calcular_ISDNV(sinal_controle):
+def calcular_ISDMV(sinal_controle):
     sinal_controle = np.array(sinal_controle).flatten()
-    derivada = np.diff(sinal_controle)
-    isdnv = np.sum((derivada / 0.1) ** 2)
-    return isdnv
+    isdmv = np.sum(sinal_controle** 2)
+    return isdmv
 
 def calcular_ISE(referencia, saida):
     erro = np.array(referencia) - np.array(saida)
@@ -184,18 +183,18 @@ ISE_CA_P = calcular_ISE(YspP_CA, np.array(Ypk_CA)[:, 1])
 ISE = [ISE_NN_M, ISE_NN_P, ISE_CA_M, ISE_CA_P]
 print(f"ISE_NN_M: {ISE_NN_M:.2f}\n ISE_NN_P: {ISE_NN_P:.2f}\n ISE_CA_M: {ISE_CA_M:.2f}\n ISE_CA_P: {ISE_CA_P:.2f}")
 
-ISDNV_CA_M = calcular_ISDNV(dUAlpha_CA)
-ISDNV_CA_P = calcular_ISDNV(dURot_CA)
-ISDNV_NN_M = calcular_ISDNV(dUAlpha_NN)
-ISDNV_NN_P = calcular_ISDNV(dURot_NN)
+ISDMV_CA_M = calcular_ISDMV(dUAlpha_CA)
+ISDMV_CA_P = calcular_ISDMV(dURot_CA)
+ISDMV_NN_M = calcular_ISDMV(dUAlpha_NN)
+ISDMV_NN_P = calcular_ISDMV(dURot_NN)
 
-ISDNV = [ISDNV_NN_M, ISDNV_NN_P, ISDNV_CA_M, ISDNV_CA_P]
-print(f"ISDNV_NN_M: {ISDNV_NN_M:.2f}\n ISDNV_NN_P: {ISDNV_NN_P:.2f}\n ISDNV_CA_M: {ISDNV_CA_M:.2f}\n ISDNV_CA_P: {ISDNV_CA_P:.2f}")
+ISDMV = [ISDMV_NN_M, ISDMV_NN_P, ISDMV_CA_M, ISDMV_CA_P]
+print(f"ISDMV_NN_M: {ISDMV_NN_M:.2f}\n ISDMV_NN_P: {ISDMV_NN_P:.2f}\n ISDMV_CA_M: {ISDMV_CA_M:.2f}\n ISDMV_CA_P: {ISDMV_CA_P:.2f}")
 
 print(f'ISE - Vazão & ${ISE_NN_M:.2f}$ & ${ISE_CA_M:.2f}$ & {((ISE_NN_M - ISE_CA_M)/ISE_CA_M)*100:.2f}%% \\\\ \n'
       f'ISE - Pressão & ${ISE_NN_P:.2f}$ & ${ISE_CA_P:.2f}$ & {((ISE_NN_P - ISE_CA_P)/ISE_CA_P)*100:.2f}%% \\\\ \n'
-      f'ISDNV - Válvula & ${ISDNV_NN_M:.2f}$ & ${ISDNV_CA_M:.2f}$ & {((ISDNV_NN_M - ISDNV_CA_M)/ISDNV_CA_M)*100:.2f}%% \\\\ \n'
-      f'ISDNV - Vel. Rotação & ${ISDNV_NN_P:.2f}$ & ${ISDNV_CA_P:.2f}$ & {((ISDNV_NN_P - ISDNV_CA_P)/ISDNV_CA_P)*100:.2f}%% \\\\')
+      f'ISDMV - Válvula & ${ISDMV_NN_M:.2f}$ & ${ISDMV_CA_M:.2f}$ & {((ISDMV_NN_M - ISDMV_CA_M)/ISDMV_CA_M)*100:.2f}%% \\\\ \n'
+      f'ISDMV - Vel. Rotação & ${ISDMV_NN_P:.2f}$ & ${ISDMV_CA_P:.2f}$ & {((ISDMV_NN_P - ISDMV_CA_P)/ISDMV_CA_P)*100:.2f}%% \\\\')
 
 print(f'Tempo Médio - RNN-MPC: {np.mean(Tempos_NN):.2f} s\n'
       f'Tempo Médio - NMPC: {np.mean(Tempos_CA):.2f} s\n'
@@ -207,7 +206,7 @@ superPlot(iter_NN, Ymk_NN,
           Tempos_NN, iter_CA,
           Ymk_CA, Ypk_CA,
           Upk_CA, YspM_CA,
-          YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDNV)
+          YspP_CA, YmMin_CA, Tempos_CA, ISE, ISDMV)
 
 phi1 = np.array(PHI_NN)
 mass1 = np.array(Ypk_NN)[:, 0]
