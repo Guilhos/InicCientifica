@@ -183,18 +183,18 @@ ISE_CA_P = calcular_ISE(YspP_CA, np.array(Ypk_CA)[:, 1])
 ISE = [ISE_NN_M, ISE_NN_P, ISE_CA_M, ISE_CA_P]
 print(f"ISE_NN_M: {ISE_NN_M:.2f}\n ISE_NN_P: {ISE_NN_P:.2f}\n ISE_CA_M: {ISE_CA_M:.2f}\n ISE_CA_P: {ISE_CA_P:.2f}")
 
-ISDMV_CA_M = calcular_ISDMV(dUAlpha_CA)
-ISDMV_CA_P = calcular_ISDMV(dURot_CA)
-ISDMV_NN_M = calcular_ISDMV(dUAlpha_NN)
-ISDMV_NN_P = calcular_ISDMV(dURot_NN)
+ISDMV_CA_A = calcular_ISDMV(dUAlpha_CA)
+ISDMV_CA_N = calcular_ISDMV(dURot_CA)
+ISDMV_NN_A = calcular_ISDMV(dUAlpha_NN)
+ISDMV_NN_N = calcular_ISDMV(dURot_NN)
 
-ISDMV = [ISDMV_NN_M, ISDMV_NN_P, ISDMV_CA_M, ISDMV_CA_P]
-print(f"ISDMV_NN_M: {ISDMV_NN_M:.2f}\n ISDMV_NN_P: {ISDMV_NN_P:.2f}\n ISDMV_CA_M: {ISDMV_CA_M:.2f}\n ISDMV_CA_P: {ISDMV_CA_P:.2f}")
+ISDMV = [ISDMV_NN_A, ISDMV_NN_N, ISDMV_CA_A, ISDMV_CA_N]
+print(f"ISDMV_NN_A: {ISDMV_NN_A:.2f}\n ISDMV_NN_N: {ISDMV_NN_N:.2f}\n ISDMV_CA_A: {ISDMV_CA_A:.2f}\n ISDMV_CA_N: {ISDMV_CA_N:.2f}")
 
-print(f'ISE - Vazão & ${ISE_NN_M:.2f}$ & ${ISE_CA_M:.2f}$ & {((ISE_NN_M - ISE_CA_M)/ISE_CA_M)*100:.2f}%% \\\\ \n'
-      f'ISE - Pressão & ${ISE_NN_P:.2f}$ & ${ISE_CA_P:.2f}$ & {((ISE_NN_P - ISE_CA_P)/ISE_CA_P)*100:.2f}%% \\\\ \n'
-      f'ISDMV - Válvula & ${ISDMV_NN_M:.2f}$ & ${ISDMV_CA_M:.2f}$ & {((ISDMV_NN_M - ISDMV_CA_M)/ISDMV_CA_M)*100:.2f}%% \\\\ \n'
-      f'ISDMV - Vel. Rotação & ${ISDMV_NN_P:.2f}$ & ${ISDMV_CA_P:.2f}$ & {((ISDMV_NN_P - ISDMV_CA_P)/ISDMV_CA_P)*100:.2f}%% \\\\')
+print(f'ISE - Vazão & ${ISE_NN_M:.2e}$ & ${ISE_CA_M:.2e}$ & {((ISE_NN_M - ISE_CA_M)/ISE_CA_M)*100:.2f}\\% \\\\ \n'
+      f'ISE - Pressão & ${ISE_NN_P:.2e}$ & ${ISE_CA_P:.2e}$ & {((ISE_NN_P - ISE_CA_P)/ISE_CA_P)*100:.2f}\\% \\\\ \n'
+      f'ISDMV - Válvula & ${ISDMV_NN_A:.2e}$ & ${ISDMV_CA_A:.2e}$ & {((ISDMV_NN_A - ISDMV_CA_A)/ISDMV_CA_A)*100:.2f}\\% \\\\ \n'
+      f'ISDMV - Vel. Rotação & ${ISDMV_NN_N:.2e}$ & ${ISDMV_CA_N:.2e}$ & {((ISDMV_NN_N - ISDMV_CA_N)/ISDMV_CA_N)*100:.2f}\\% \\\\')
 
 print(f'Tempo Médio - RNN-MPC: {np.mean(Tempos_NN):.2f} s\n'
       f'Tempo Médio - NMPC: {np.mean(Tempos_CA):.2f} s\n'
