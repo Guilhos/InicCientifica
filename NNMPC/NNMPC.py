@@ -228,7 +228,7 @@ class PINN_MPC():
             phi.append(x)
 
             if i == 10:
-                self.y_sp = np.array([[7], [6]])
+                self.y_sp = np.array([[7], [6.2]])
                 self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1))
             elif i == 50:
                 self.y_sp = np.array([[9], [7.05]])

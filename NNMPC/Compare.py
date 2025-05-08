@@ -52,7 +52,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Vazão / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(6, 11)
+    plt.ylim(6, 10.5)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
@@ -90,7 +90,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Pressão / MPa")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(5.5, 8)
+    plt.ylim(5.5, 7.75)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico

@@ -125,7 +125,7 @@ class Interpolation:
 
         # Plot
         fig, ax = plt.subplots(figsize=(16, 9), dpi=400)
-        ax.contour(M_mesh, Phi_mesh, N_interp, levels=10, colors='black')
+        ax.contour(M_mesh, Phi_mesh, N_interp, levels=10, colors='gray')
 
         # Trajetória 1 (se fornecida)
         if phi1 is not None and mass1 is not None:
