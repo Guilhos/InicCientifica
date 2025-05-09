@@ -49,9 +49,9 @@ class OptunaWithProgress:
     def run_optimization(self):
         def objective(trial):
             # Sugere os dividendos
-            q_pressao_div = trial.suggest_float('q_pressao_div', 1e-6, 1, log=True)
-            r_alpha_div = trial.suggest_float('r_alpha_div', 1e-6, 1, log=True)
-            r_n_div = trial.suggest_float('r_n_div', 1e-6, 1, log=True)
+            q_pressao_div = trial.suggest_float('q_pressao_div', 1e-9, 1, log=True)
+            r_alpha_div = trial.suggest_float('r_alpha_div', 1e-9, 1, log=True)
+            r_n_div = trial.suggest_float('r_n_div', 1e-9, 1, log=True)
 
             # Calcula Q e R
             qVazao = 1 / 12.5653085708618164062**2
@@ -76,8 +76,8 @@ class OptunaWithProgress:
                 ISDNV_rot = calcular_ISDMV(dURot_NN)
                 ISDNV_alpha = calcular_ISDMV(dUAlpha_NN)
 
-                erro_total = ISE_m*1e2/ 12.5653085708618164062**2 + ISE_p*1e2/ 9.30146217346191406250**2
-                + ISDNV_rot *1e-5 / 5000**2 + ISDNV_alpha*1e-2 / 0.15**2
+                erro_total = ISE_m * 1e5/ 12.5653085708618164062**2 + ISE_p*1e7/ 9.30146217346191406250**2
+                + ISDNV_rot * 1e-3 / 5000**2 + ISDNV_alpha *1e2 / 0.15**2
                 return erro_total
 
             except Exception as e:
@@ -95,4 +95,4 @@ class OptunaWithProgress:
         self.label.config(text="Otimização concluída!")
 
 # Executar com 50 trials
-OptunaWithProgress(total_trials=10)
+OptunaWithProgress(total_trials=50)

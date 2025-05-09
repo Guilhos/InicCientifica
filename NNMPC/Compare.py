@@ -69,10 +69,10 @@ def superPlot(iter_NN, Ymk_NN,
     erro_CA = np.array(Ypk_CA)[:, 0] - YmMin_CA.squeeze()
     plt.plot(x_CA / 2, erro_CA, linestyle="-", label="NMPC", color="red", linewidth=2.5)
     plt.axhline(0, color="black", linestyle="-.", label="Restrição de Surge", linewidth=2.5)
-    plt.ylabel("Distância a linha de surge / kg/s")
+    plt.ylabel("Distância a margem de segurança / kg/s")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(-1, 1.5)  # Ajuste os limites do eixo Y conforme necessário
+    plt.ylim(-0.5, 1.2)  # Ajuste os limites do eixo Y conforme necessário
     plt.legend(
         loc='lower center',
         bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
@@ -90,7 +90,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Pressão / MPa")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(5.5, 7.75)
+    plt.ylim(5.75, 8)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
