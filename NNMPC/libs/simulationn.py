@@ -166,10 +166,10 @@ class Simulation:
     def ySetPoint(self, nSP):
         SPlist = []
         for i in range(nSP):
-            a = np.random.randint(35,65)/100
-            b = np.random.randint(27e3,5e4)
+            a = np.random.randint(45,55)/100
+            b = np.random.randint(35e3,5e3)
             result = fsolve(self.fun, (12.10, 10), args=(a,b,self.lut))
-            SPlist.append(result)
+            SPlist.append([result,a,b])
         return SPlist
 
 
