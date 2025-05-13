@@ -3,5 +3,13 @@ name = "iniccientifica"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
+requires-python = "==3.13.3"
+dependencies = [
+    "casadi>=3.7.0",
+    "matplotlib>=3.10.3",
+    "numpy>=2.2.5",
+    "optuna>=4.3.0",
+    "pandas>=2.2.3",
+    "scipy>=1.15.3",
+    "torch>=2.7.0",
+]
