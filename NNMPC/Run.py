@@ -2,15 +2,19 @@ from CAMPC import Only_NMPC
 from NNMPC import PINN_MPC
 import pickle
 
-qVazao = 1/12.5653085708618164062**2
-qPressao = 0.05/9.30146217346191406250**2
-rAlpha = 1e-5/0.15**2
-rN = 5e-5/5000**2
+qVazao_NN = 1/12.5653085708618164062**2
+qPressao_NN = 0.018995940612126103/9.30146217346191406250**2
+rAlpha_NN = 1.2078697749529814e-05/0.15**2
+rN_NN = 1.6860828534914547e-05/5000**2
+qVazao_CA = 1/12.5653085708618164062**2
+qPressao_CA = 2.0957732481030358e-05/9.30146217346191406250**2
+rAlpha_CA = 1.3895598044290252e-05/0.15**2
+rN_CA = 2.2019296487652396e-05/5000**2
 
-p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
+p, m, q_NN, r_NN, q_CA, r_CA, steps = 12, 3, [qVazao_NN,qPressao_NN], [rAlpha_NN, rN_NN], [qVazao_CA,qPressao_CA], [rAlpha_CA, rN_CA], 3
 
-NNMPC = PINN_MPC(p, m, q, r, steps)
-CAMPC = Only_NMPC(p, m, q, r, steps)
+NNMPC = PINN_MPC(p, m, q_NN, r_NN, steps)
+CAMPC = Only_NMPC(p, m, q_CA, r_CA, steps)
 iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN, PHI_NN =  NNMPC.run()
 iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA, PHI_CA = CAMPC.run()
 
