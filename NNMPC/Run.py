@@ -3,9 +3,9 @@ from NNMPC import PINN_MPC
 import pickle
 
 qVazao = 1/12.5653085708618164062**2
-qPressao = 0.05/9.30146217346191406250**2
+qPressao = 0.005/9.30146217346191406250**2
 rAlpha = 0/0.15**2
-rN = 9e-4/5000**2
+rN = 6e-5/5000**2
 
 p, m, q, r, steps = 12, 3, [qVazao,qPressao], [rAlpha, rN], 3
 
