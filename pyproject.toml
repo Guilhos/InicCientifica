@@ -10,7 +10,6 @@ dependencies = [
     "numpy>=2.2.5",
     "optuna>=4.3.0",
     "pandas>=2.2.3",
-    "pyqt5>=5.15.11",
     "scipy>=1.15.3",
     "torch>=2.7.0",
 ]
