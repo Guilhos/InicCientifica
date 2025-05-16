@@ -146,8 +146,8 @@ class Interpolation:
             ncol=3,
             frameon=False
         )
-        ax.set_ylim(1.2, 1.8)
-        ax.set_xlim(6,11)
+        ax.set_ylim(1.275, 1.75)
+        ax.set_xlim(6.8,10)
         plt.subplots_adjust(top=0.92, bottom=0.25, wspace=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(images_path, "interpolation_with_trajectories.png"))
