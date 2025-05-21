@@ -39,7 +39,7 @@ def run_optuna(total_trials):
 
         p, m, steps = 12, 3, 3
         try:
-            NNMPC = Only_NMPC(p, m, q, r, steps)
+            NNMPC = PINN_MPC(p, m, q, r, steps)
             iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN, PHI_NN = NNMPC.run()
 
             YspM = YspM_NN
@@ -54,8 +54,8 @@ def run_optuna(total_trials):
             erro_total = (
                 ISE_m * 1e6 / 12.5653085708618164062**2
                 + ISE_p * 1e7 / 9.30146217346191406250**2
-                + ISDNV_rot * 1e-6 / 5000**2
-                + ISDNV_alpha * 1e-3 / 0.15**2
+                + ISDNV_rot * 1e-5 / 5000**2
+                + ISDNV_alpha * 1 / 0.15**2
             )
         except Exception as e:
             erro_total = float('inf')
@@ -72,4 +72,4 @@ def run_optuna(total_trials):
     print("Menor erro total:", study.best_value)
 
 if __name__ == "__main__":
-    run_optuna(total_trials=20)
+    run_optuna(total_trials=50)

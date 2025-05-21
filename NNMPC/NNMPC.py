@@ -121,7 +121,7 @@ class PINN_MPC():
         opti.subject_to(opti.bounded(0, Fs, 10e23))
 
         # lbg e ubg
-        opti.subject_to(opti.bounded(y_min, yModel_pred, self.y_max))
+        opti.subject_to(opti.bounded(y_min, yModel_pred + dYk, self.y_max))
         opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.m, 1) + matriz_inferior @ dUs, self.u_max))
         opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dUs.T @ self.r @ dUs == 0)  # Restrições de igualdade
 
