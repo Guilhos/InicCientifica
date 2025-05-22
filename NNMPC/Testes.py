@@ -2,6 +2,7 @@ import optuna
 import numpy as np
 import sys
 import time
+import pickle
 from CAMPC import Only_NMPC
 from NNMPC import PINN_MPC  # se usado
 
@@ -52,10 +53,10 @@ def run_optuna(total_trials):
             ISDNV_alpha = calcular_ISDMV(dUAlpha_NN)
 
             erro_total = (
-                ISE_m * 1e6 / 12.5653085708618164062**2
-                + ISE_p * 1e7 / 9.30146217346191406250**2
-                + ISDNV_rot * 1e-5 / 5000**2
-                + ISDNV_alpha * 1 / 0.15**2
+                ISE_m * 5e2 / 12.5653085708618164062**2
+                + ISE_p * 1e3 / 9.30146217346191406250**2
+                + ISDNV_rot * 1e4 / 5000**2
+                + ISDNV_alpha * 1e6 / 0.15**2
             )
         except Exception as e:
             erro_total = float('inf')
@@ -65,11 +66,50 @@ def run_optuna(total_trials):
         return erro_total
 
     study = optuna.create_study(direction='minimize')
+    
+    # ✅ Chutes iniciais sugeridos
+    initial_params = {
+        'q_pressao_div': 0.0284140487,
+        'r_alpha_div': 0.0001406578,
+        'r_n_div': 0.0000177890,
+    }
+    study.enqueue_trial(initial_params)  # Força que o primeiro trial use esses valores
+    
     study.optimize(objective, n_trials=total_trials)
 
     print("\n✅ Otimização concluída!")
     print("Melhores parâmetros encontrados:", study.best_params)
     print("Menor erro total:", study.best_value)
+    
+    # Reexecutar o melhor caso e salvar resultados
+    best_params = study.best_params
+    qVazao = 1 / 12.5653085708618164062**2
+    qPressao = best_params['q_pressao_div'] / 9.30146217346191406250**2
+    rAlpha = best_params['r_alpha_div'] / 0.15**2
+    rN = best_params['r_n_div'] / 5000**2
+
+    q = [qVazao, qPressao]
+    r = [rAlpha, rN]
+
+    p, m, steps = 12, 3, 3
+    NNMPC = PINN_MPC(p, m, q, r, steps)
+    iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN, PHI_NN = NNMPC.run()
+
+    with open('NNMPC/libs/resultados_NNMPC.pkl', 'wb') as f:
+        pickle.dump(
+            (
+                iter_NN, Ymk_NN, Ypk_NN, Upk_NN,
+                dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN,
+                YmMin_NN, Tempos_NN, PHI_NN
+            ), f
+        )
+        
+    with open('NNMPC/libs/melhores_parametros.txt', 'w') as f:
+        f.write("Melhores parâmetros encontrados:\n")
+        for chave, valor in best_params.items():
+            f.write(f"{chave}: {valor:.10f}\n")
+        f.write(f"\nMenor erro total: {study.best_value:.10f}\n")
+    
 
 if __name__ == "__main__":
-    run_optuna(total_trials=50)
+    run_optuna(total_trials=25)
