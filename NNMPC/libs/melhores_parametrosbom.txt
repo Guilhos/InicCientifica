@@ -1,0 +1,6 @@
+Melhores parâmetros encontrados:
+q_pressao_div: 0.0284140487
+r_alpha_div: 0.0001406578
+r_n_div: 0.0000177890
+
+Menor erro total: 167643.2120903626
