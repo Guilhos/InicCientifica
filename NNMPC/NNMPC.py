@@ -128,6 +128,7 @@ class PINN_MPC():
         opti.solver('ipopt', {
             "ipopt.print_level": 0,
             "ipopt.tol": 1e-6,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
+            "ipopt.constr_viol_tol": 1e-8,            # Tolerância aceitável
             "ipopt.max_iter": 750,                   # Reduz número de iterações (ajustável)
             "ipopt.mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
             "ipopt.linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
