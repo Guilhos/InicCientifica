@@ -1,6 +1,6 @@
 Melhores parâmetros encontrados:
-q_pressao_div: 0.0284140487
-r_alpha_div: 0.0001406578
-r_n_div: 0.0000177890
+q_pressao_div: 0.00595291138285196
+r_alpha_div: 1.7265739711101886e-05
+r_n_div: 1.670100362973488e-05
 
-Menor erro total: 5485294.6022649743
+Menor erro total: 51573484.52056599

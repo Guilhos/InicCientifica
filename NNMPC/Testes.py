@@ -26,9 +26,9 @@ def progress_bar(atual, total, erro=None):
 
 def run_optuna(total_trials):
     def objective(trial):
-        q_pressao_div = trial.suggest_float('q_pressao_div', 1e-6, 1, log=True)
-        r_alpha_div = trial.suggest_float('r_alpha_div', 1e-6, 1, log=True)
-        r_n_div = trial.suggest_float('r_n_div', 1e-6, 1, log=True)
+        q_pressao_div = trial.suggest_float('q_pressao_div', 1e-3, 0.1, log=True)
+        r_alpha_div = trial.suggest_float('r_alpha_div', 1e-5, 1e-3, log=True)
+        r_n_div = trial.suggest_float('r_n_div', 1e-6, 1e-4, log=True)
 
         qVazao = 1 / 12.5653085708618164062**2
         qPressao = q_pressao_div / 9.30146217346191406250**2
@@ -54,7 +54,7 @@ def run_optuna(total_trials):
 
             erro_total = (
                 ISE_m * 5e2 / 12.5653085708618164062**2
-                + ISE_p * 1e3 / 9.30146217346191406250**2
+                + ISE_p * 1e6 / 9.30146217346191406250**2
                 + ISDNV_rot * 1e4 / 5000**2
                 + ISDNV_alpha * 1e6 / 0.15**2
             )
@@ -66,14 +66,6 @@ def run_optuna(total_trials):
         return erro_total
 
     study = optuna.create_study(direction='minimize')
-    
-    # ✅ Chutes iniciais sugeridos
-    initial_params = {
-        'q_pressao_div': 0.0284140487,
-        'r_alpha_div': 0.0001406578,
-        'r_n_div': 0.0000177890,
-    }
-    study.enqueue_trial(initial_params)  # Força que o primeiro trial use esses valores
     
     study.optimize(objective, n_trials=total_trials)
 
@@ -107,9 +99,9 @@ def run_optuna(total_trials):
     with open('NNMPC/libs/melhores_parametros.txt', 'w') as f:
         f.write("Melhores parâmetros encontrados:\n")
         for chave, valor in best_params.items():
-            f.write(f"{chave}: {valor:.10f}\n")
-        f.write(f"\nMenor erro total: {study.best_value:.10f}\n")
+            f.write(f"{chave}: {valor}\n")
+        f.write(f"\nMenor erro total: {study.best_value}\n")
     
 
 if __name__ == "__main__":
-    run_optuna(total_trials=25)
+    run_optuna(total_trials=100)
