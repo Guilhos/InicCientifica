@@ -16,10 +16,10 @@ p, m, q_NN, r_NN, q_CA, r_CA, steps = 12, 3, [qVazao_NN,qPressao_NN], [rAlpha_NN
 NNMPC = PINN_MPC(p, m, q_NN, r_NN, steps)
 CAMPC = Only_NMPC(p, m, q_CA, r_CA, steps)
 iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN, PHI_NN = NNMPC.run()
-#iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA, PHI_CA = CAMPC.run()
+iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA, PHI_CA = CAMPC.run()
 
 with open('NNMPC/libs/resultados_NNMPC.pkl', 'wb') as f:
     pickle.dump((iter_NN, Ymk_NN, Ypk_NN, Upk_NN, dURot_NN, dUAlpha_NN, YspM_NN, YspP_NN, YmMin_NN, Tempos_NN, PHI_NN), f)
 
-#with open('NNMPC/libs/resultados_CAMPC.pkl', 'wb') as f:
-    #pickle.dump((iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA, PHI_CA), f)
+with open('NNMPC/libs/resultados_CAMPC.pkl', 'wb') as f:
+    pickle.dump((iter_CA, Ymk_CA, Ypk_CA, Upk_CA, dURot_CA, dUAlpha_CA, YspM_CA, YspP_CA, YmMin_CA, Tempos_CA, PHI_CA), f)
