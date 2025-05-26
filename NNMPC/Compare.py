@@ -90,7 +90,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.ylabel("Pressão / MPa")
     plt.xlabel("Tempo / s")
     plt.grid()
-    plt.ylim(5.75, 7.6)
+    plt.ylim(5.9, 7.65)
     plt.legend(
             loc='lower center',
             bbox_to_anchor=(0.5, -0.35),  # Posiciona a legenda abaixo do gráfico
@@ -139,16 +139,23 @@ def superPlot(iter_NN, Ymk_NN,
     plt.subplots_adjust(top=0.92, bottom=0.25, wspace=0.3)
     plt.savefig(os.path.join(images_path, "velocidade_rotacao_tempo_subplot.png"))
 
+    # Filtrar os dados para ignorar outliers acima de 5 segundos
+    Tempos_CA_filtrado = [t for t in Tempos_CA if t <= 5]
+    Tempos_NN_filtrado = [t for t in Tempos_NN if t <= 5]
+
     # Histograma das Frequências de Tempo
-    plt.figure(figsize=(16,9), dpi = 400)
-    plt.hist(Tempos_CA, bins=26, color='red', alpha=0.7, edgecolor='black', label="NMPC")
-    plt.axvline(np.mean(Tempos_CA), color='red', linestyle="--", label="Média NMPC", linewidth=2.5)
-    print(f"Média NMPC: {np.mean(Tempos_CA):.2f} s")
-    plt.hist(Tempos_NN, bins=26, color='blue', alpha=0.7, edgecolor='black', label ="RNN-MPC")
-    plt.axvline(np.mean(Tempos_NN), color='blue', linestyle="--", label="Média RNN-MPC", linewidth=2.5)
-    print(f"Média PIRNN-MPC: {np.mean(Tempos_NN):.2f} s")
-    plt.axvspan(0, 0.5, color='black', alpha=0.3, label="Zona de Interesse")  # Adiciona a região cinza claro
+    plt.figure(figsize=(16, 9), dpi=400)
+    plt.hist(Tempos_CA_filtrado, bins=26, color='red', alpha=0.7, edgecolor='black', label="NMPC")
+    plt.axvline(np.mean(Tempos_CA_filtrado), color='red', linestyle="--", label="Média NMPC", linewidth=2.5)
+    print(f"Média NMPC (sem outliers): {np.mean(Tempos_CA_filtrado):.2f} s")
+
+    plt.hist(Tempos_NN_filtrado, bins=26, color='blue', alpha=0.7, edgecolor='black', label="RNN-MPC")
+    plt.axvline(np.mean(Tempos_NN_filtrado), color='blue', linestyle="--", label="Média RNN-MPC", linewidth=2.5)
+    print(f"Média PIRNN-MPC (sem outliers): {np.mean(Tempos_NN_filtrado):.2f} s")
+
+    plt.axvspan(0, 0.5, color='black', alpha=0.3, label="Zona de Interesse")  # Região cinza claro
     plt.axvline(0.5, color='green', linestyle="--", label="Tempo Amostral", linewidth=2.5)
+
     plt.xlabel("Tempo / s")
     plt.ylabel("Frequência")
     configurar_legenda()
@@ -156,6 +163,7 @@ def superPlot(iter_NN, Ymk_NN,
     plt.subplots_adjust(top=0.92, bottom=0.30)
     plt.savefig(os.path.join(images_path, "histograma_frequencias_tempo.png"))
     plt.close()
+
     
 def calcular_ISDMV(sinal_controle):
     sinal_controle = np.array(sinal_controle).flatten()

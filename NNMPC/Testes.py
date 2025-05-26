@@ -26,9 +26,9 @@ def progress_bar(atual, total, erro=None):
 
 def run_optuna(total_trials):
     def objective(trial):
-        q_pressao_div = trial.suggest_float('q_pressao_div', 1e-3, 0.1, log=True)
-        r_alpha_div = trial.suggest_float('r_alpha_div', 1e-5, 1e-3, log=True)
-        r_n_div = trial.suggest_float('r_n_div', 1e-6, 1e-4, log=True)
+        q_pressao_div = trial.suggest_float('q_pressao_div', 1e-6, 1, log=True)
+        r_alpha_div = trial.suggest_float('r_alpha_div', 1e-6, 1, log=True)
+        r_n_div = trial.suggest_float('r_n_div', 1e-6, 1, log=True)
 
         qVazao = 1 / 12.5653085708618164062**2
         qPressao = q_pressao_div / 9.30146217346191406250**2
@@ -54,9 +54,9 @@ def run_optuna(total_trials):
 
             erro_total = (
                 ISE_m * 5e2 / 12.5653085708618164062**2
-                + ISE_p * 1e6 / 9.30146217346191406250**2
-                + ISDNV_rot * 1e4 / 5000**2
-                + ISDNV_alpha * 1e6 / 0.15**2
+                + ISE_p * 1e4 / 9.30146217346191406250**2
+                + ISDNV_rot * 1 / 5000**2
+                + ISDNV_alpha * 1 / 0.15**2
             )
         except Exception as e:
             erro_total = float('inf')
@@ -104,4 +104,4 @@ def run_optuna(total_trials):
     
 
 if __name__ == "__main__":
-    run_optuna(total_trials=100)
+    run_optuna(total_trials=25)

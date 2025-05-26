@@ -1,6 +1,6 @@
-Melhores par‚metros encontrados:
-q_pressao_div: 0.007671468224213146
-r_alpha_div: 3.455607894348859e-05
-r_n_div: 2.35665126267062e-05
+Melhores par√¢metros encontrados:
+q_pressao_div: 9.012890204376165e-05
+r_alpha_div: 1.0008023345347609e-05
+r_n_div: 0.1364057824900683
 
-Menor erro total: 46810270.73937042
+Menor erro total: 314183.485232171

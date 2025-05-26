@@ -64,10 +64,9 @@ class Only_NMPC():
         return ca.DM(matriz)  # Convertendo para CasADi DM
     
     def f_vazaoMin(self):
-        M = ca.MX.sym('M', 1)
         x = ca.MX.sym('x', 1)
         f = self.params[0] + self.params[1]*x + self.params[2]*x**2 + self.params[3]*x**3
-        return ca.Function('f_vazaoMin', [x,M], [f])
+        return ca.Function('f_vazaoMin', [x], [f])
 
     def ajusteMatrizes(self):
         self.y_sp = ca.DM(self.iTil(self.y_sp,self.p).reshape(-1,1)) # Expansão do y_setpoint para P. SHAPE -> (nY*P, 1) # Expansão do y_min para P. SHAPE -> (nY*P, 1)
@@ -98,7 +97,6 @@ class Only_NMPC():
         alphak = opti.parameter(3, 1)  # Parâmetro para alphas
         nrotk = opti.parameter(3, 1)  # Parâmetro para N_RotS
         y_min = opti.parameter(self.nY * self.p, 1)
-
     
         x = ca.vertcat(dUs, Fs)
         
@@ -123,11 +121,12 @@ class Only_NMPC():
         # lbg e ubg
         opti.subject_to(opti.bounded(y_min, yModel_pred + dYk, self.y_max))
         opti.subject_to(opti.bounded(self.u_min, ca.repmat(uModelk[-2:], self.m, 1) + matriz_inferior @ dUs, self.u_max))
-        opti.subject_to(Fs - (yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dUs.T @ self.r @ dUs == 0)  # Restrições de igualdade
+        opti.subject_to(Fs - ((yModel_pred - ysp + dYk).T @ self.q @ (yModel_pred - ysp + dYk) + dUs.T @ self.r @ dUs) == 0)  # Restrições de igualdade
 
         opti.solver('ipopt', {
             "ipopt.print_level": 0,
             "ipopt.tol": 1e-6,                      # Tolerância do solver (pode ajustar entre 1e-4 e 1e-8)
+            "ipopt.constr_viol_tol": 1e-8,          
             "ipopt.max_iter": 750,                   # Reduz número de iterações (ajustável)
             "ipopt.mu_strategy": "adaptive",         # Estratégia de barreira mais eficiente
             "ipopt.linear_solver": "mumps",          # Solver linear mais rápido para problemas médios/grandes
@@ -184,7 +183,7 @@ class Only_NMPC():
         iter = 130
         for i in range(iter): 
             x = self.lut(ca.vertcat(umk[-1],ypk[-2]))
-            mMink = self.mMin(x,ypk[-2])
+            mMink = self.mMin(x)
             mMink = np.array(mMink.full())
             self.y_min = np.array([[float(mMink[0][0])], [5.27]])
 
