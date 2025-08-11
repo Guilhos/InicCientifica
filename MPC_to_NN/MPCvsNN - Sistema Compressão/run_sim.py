@@ -59,15 +59,16 @@ for i in range(p):
             continue
 
 H = theta.T @ Q @ theta + R
-F = np.block([[Q @ theta], [Q @ theta]])
+H = (H + H.T) / 2  # Garantir que H é simétrico
+F = np.block([[psi.T @ Q @ theta], [Q @ theta]])
 
 G = np.block([[theta], [-theta], [thetaU], [-thetaU], [np.eye(nx, nu)], [-np.eye(nx, nu)]])
-Su = np.block([[psi, np.zeros((nx, Nx*Nu))],
-                [-psi, np.zeros((nx, Nx*Nu))],
-                [psiu, np.zeros((nx, Nx*Nu))],
-                [-psiu, np.zeros((nx, Nx*Nu))],
-                [np.zeros((nx, Nx*Nu)), np.zeros((nx, Nx*Nu))],
-                [np.zeros((nx, Nx*Nu)), np.zeros((nx, Nx*Nu))]])
+Su = np.block([[psi, np.zeros((nx, nx))],
+                [-psi, np.zeros((nx, nx))],
+                [psiu, np.zeros((nx, nx))],
+                [-psiu, np.zeros((nx, nx))],
+                [np.zeros((nx, Nx*Nu)), np.zeros((nx, nx))],
+                [np.zeros((nx, Nx*Nu)), np.zeros((nx, nx))]])
 
 # Simulação do MPC
 
@@ -77,9 +78,8 @@ u0 = np.array([[0.5], [38500]])
 xk = x0.copy()
 uk = u0.copy()
 x_k = np.block([[xk], [uk]])
-deltaY = np.zeros((p, Nx)).reshape(-1, 1)
 yspk = (np.ones((p, Nx)) * [8.5, 6.9]).reshape(-1, 1)
-z_k = np.block([[x_k.T @ psi.T], [deltaY.T -  yspk.T]])
+z_k = np.block([x_k.T, -yspk.T])
 
 yMax = np.tile(np.array([[12.3], [9.3]]), (p,1))
 yMin = np.tile(np.array([[5.5], [5.27]]), (p,1))
@@ -96,8 +96,8 @@ z_k_store_mpc = np.zeros((nx, K))
 
 for j in range(K):
     deltaU = cp.Variable((nu, 1))
-    cost = cp.quad_form(deltaU, H) + 2 * z_k.T @ F @ deltaU
-    constraints = [G @ deltaU <= Su @ z_k + w]
+    cost = cp.quad_form(deltaU, H) + 2 * z_k @ F @ deltaU
+    constraints = [G @ deltaU <= Su @ z_k.T + w]
     prob = cp.Problem(cp.Minimize(cost), constraints)
     prob.solve()
 
@@ -109,9 +109,8 @@ for j in range(K):
     xk = A @ xk + B @ uk
     x_k = np.block([[xk], [uk]])
 
-    deltaY = np.zeros((p, Nx)).reshape(-1, 1) # Sem mismatch da Planta, implementar
     yspk = (np.ones((p, Nx)) * [8.5, 6.9]).reshape(-1, 1)  # Depois alterar o setpoint
-    z_k = np.block([[x_k.T @ psi.T], [deltaY.T - yspk.T]]).reshape(-1,1)
+    z_k = np.block([[x_k.T @ psi.T], [- yspk.T]]).reshape(-1,1)
 
     z_k_store_mpc[:, j] = z_k
 
