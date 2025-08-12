@@ -19,41 +19,42 @@ class CA_Model:
             pesos[nome] = array
             print(f"{nome} -> shape: {array.shape}")
         
-        Wi = state_dict['rnn_layer.weight_ih_l0'][:].numpy()
-        Wh = state_dict['rnn_layer.weight_hh_l0'][:].numpy()
-        Bi = state_dict['rnn_layer.bias_ih_l0'][:].numpy()
-        Bh = state_dict['rnn_layer.bias_hh_l0'][:].numpy()
-        print(Wi.shape, Wh.shape, Bi.shape, Bh.shape)
-        
-        Wii = ca.DM(Wi[:self.H])
-        Wif = ca.DM(Wi[self.H:2*self.H])
-        Wig = ca.DM(Wi[2*self.H:3*self.H])
-        Wio = ca.DM(Wi[3*self.H:4*self.H])
-        Wi = [Wii,Wif,Wig,Wio]
-        
-        Whi = ca.DM(Wh[:self.H])
-        Whf = ca.DM(Wh[self.H:2*self.H])
-        Whg = ca.DM(Wh[2*self.H:3*self.H])
-        Who = ca.DM(Wh[3*self.H:4*self.H])
-        Wh = [Whi, Whf, Whg, Who]
-        
-        Bii = ca.DM(Bi[:self.H].reshape(-1, 1))
-        Bif = ca.DM(Bi[self.H:2*self.H].reshape(-1, 1))
-        Big = ca.DM(Bi[2*self.H:3*self.H].reshape(-1, 1))
-        Bio = ca.DM(Bi[3*self.H:4*self.H].reshape(-1, 1))
-        Bi = [Bii,Bif,Big,Bio]
-        
-        Bhi = ca.DM(Bh[:self.H].reshape(-1, 1))
-        Bhf = ca.DM(Bh[self.H:2*self.H].reshape(-1, 1))
-        Bhg = ca.DM(Bh[2*self.H:3*self.H].reshape(-1, 1))
-        Bho = ca.DM(Bh[3*self.H:4*self.H].reshape(-1, 1))
-        Bh = [Bhi,Bhf,Bhg,Bho]
-        
-        LSTM = [Wi,Wh,Bi,Bh]
-        
-        Wd1 = ca.DM(state_dict['dense_layers.0.weight'].numpy())
-        Bd1 = ca.DM(state_dict['dense_layers.0.bias'].numpy())
-        Dense1 = [Wd1,Bd1]
+        # LSTM
+        Wi_full = pesos['onnx::LSTM_122'].squeeze(0)  # (400, 7)
+        Wh_full = pesos['onnx::LSTM_123'].squeeze(0)  # (400, 100)
+        B_full  = pesos['onnx::LSTM_124'].squeeze(0)  # (800,)
+
+        # Separar por gates (input, forget, cell, output)
+        Wi = [ca.DM(Wi_full[0*self.H:1*self.H, :]),
+            ca.DM(Wi_full[1*self.H:2*self.H, :]),
+            ca.DM(Wi_full[2*self.H:3*self.H, :]),
+            ca.DM(Wi_full[3*self.H:4*self.H, :])]
+
+        Wh = [ca.DM(Wh_full[0*self.H:1*self.H, :]),
+            ca.DM(Wh_full[1*self.H:2*self.H, :]),
+            ca.DM(Wh_full[2*self.H:3*self.H, :]),
+            ca.DM(Wh_full[3*self.H:4*self.H, :])]
+
+        # Bias no ONNX vem concatenado: [bias_ih_l0 | bias_hh_l0]
+        Bi_full = B_full[:4*self.H]     # primeiros 400
+        Bh_full = B_full[4*self.H:]     # últimos 400
+
+        Bi = [ca.DM(Bi_full[0*self.H:1*self.H].reshape(-1,1)),
+            ca.DM(Bi_full[1*self.H:2*self.H].reshape(-1,1)),
+            ca.DM(Bi_full[2*self.H:3*self.H].reshape(-1,1)),
+            ca.DM(Bi_full[3*self.H:4*self.H].reshape(-1,1))]
+
+        Bh = [ca.DM(Bh_full[0*self.H:1*self.H].reshape(-1,1)),
+            ca.DM(Bh_full[1*self.H:2*self.H].reshape(-1,1)),
+            ca.DM(Bh_full[2*self.H:3*self.H].reshape(-1,1)),
+            ca.DM(Bh_full[3*self.H:4*self.H].reshape(-1,1))]
+
+        LSTM = [Wi, Wh, Bi, Bh]
+
+        # Dense (camada de saída)
+        Wd1 = ca.DM(pesos['output_layer.weight'])
+        Bd1 = ca.DM(pesos['output_layer.bias'].reshape(-1,1))
+        Dense1 = [Wd1, Bd1]
         
         #print(Wd1.shape, Bd1.shape, Wd2.shape, Bd2.shape)
         
