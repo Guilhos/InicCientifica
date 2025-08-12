@@ -11,6 +11,7 @@ dependencies = [
     "ipykernel>=6.30.1",
     "matplotlib>=3.10.3",
     "numpy>=2.2.5",
+    "onnx>=1.18.0",
     "optuna>=4.3.0",
     "pandas>=2.2.3",
     "scikit-learn>=1.7.0",

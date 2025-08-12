@@ -1,5 +1,6 @@
 import numpy as np
-import torch
+import onnx
+from onnx import numpy_helper
 import casadi as ca
 import matplotlib.pyplot as plt
 
@@ -8,7 +9,15 @@ class CA_Model:
         # Carregar os pesos do modelo salvos
         model_path = modelpath
         self.H = 100
-        state_dict = torch.load(model_path)
+        state_dict = onnx.load(model_path)
+
+        pesos = {}
+
+        for inicializador in state_dict.graph.initializer:
+            nome = inicializador.name
+            array = numpy_helper.to_array(inicializador)  # Converte para NumPy
+            pesos[nome] = array
+            print(f"{nome} -> shape: {array.shape}")
         
         Wi = state_dict['rnn_layer.weight_ih_l0'][:].numpy()
         Wh = state_dict['rnn_layer.weight_hh_l0'][:].numpy()
@@ -166,35 +175,31 @@ class CA_Model:
 
         return ca.Function('CA_Model_MPC', [y_k1, u_k1, du_k], [y_k])
 
-        
-
 if __name__ == '__main__':
-    from libs.simulationn import Simulation
+    from libs.simulation import Simulation
 
-    p = 100
+    p = 10
     m = 3
-
-    sim = Simulation(3,3,3)
-    sim_mf = Simulation(100,3,3)
-    y0, u0 = sim.pIniciais()
-    nU = len(u0) // m
-    dU = [[0],[0],[0],[0],[0],[0]]
+    steps = 3
+    y0 = [14.9919, 339.69, 0.42885, 6245.39, 6245.39, 321.672, 0.445562, 319.423, 0.503621, 320.097, 0.396345, 339.69, 0.42885, 0.514917]
+    u0 = [4500, 300, 600, 0.5, 5000]
+    nU = len(u0)
+    nY = len(y0)
+    dU = np.zeros((m*nU,1))
     dU = np.concatenate((np.array(dU), np.zeros((int(nU) * (p-m), 1))))
-    yPlanta = sim_mf.pPlanta(y0,dU)
 
     # Criar a instância da rede CasADi
-    Modelo = CA_Model("NNMPC/libs/modelo_treinado.pth", p, m, nU, nU, 3)
+    Modelo = CA_Model("NNMPC/Compressão Complexo/modelo.onnx", p, m, nU, nU, 3)
 
     dU = [[0],[0],[0],[0],[0],[0]]
     saida = Modelo.pred_function(ca.DM(y0),ca.DM(u0),ca.DM(dU))
     saida2 = []
     for i in range(200):
-        saida2.append(Modelo.f_function(ca.vertcat(y0[-6:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:])))
+        saida2.append(Modelo.f_function(ca.vertcat(y0[-steps*nY:-4],u0[-6:-4]),ca.vertcat(y0[-4:-2],u0[-4:-2]),ca.vertcat(y0[-2:],u0[-2:])))
         y0 = ca.vertcat(y0, saida2[-1])
     saida2 = np.array(saida2)
 
     x = np.linspace(0, 100, 100)
-    plt.plot(x, yPlanta[::2,0])
     plt.plot(x, saida[::2,0])
     plt.plot(x, saida2[::2,0])
     plt.legend(['Planta', 'Rede 1', 'Rede 2'])
