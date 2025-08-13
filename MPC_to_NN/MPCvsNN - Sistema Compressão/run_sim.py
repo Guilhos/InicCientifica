@@ -21,12 +21,11 @@ class Interpolation:
         self.params = [-25.0181, 42.0452, -17.9068, 3.0313]
 
     def load_data(self):
-        # Simulando leitura de dados (substitua pelo seu CSV real)
         self.data = pd.read_csv(self.file_path, decimal = self.decimal)
-        self.N_rot = np.arange(2e4, 6e4, 1e3)  # Shape: (40,)
-        self.Mass = np.arange(3, 21.1, 0.1)    # Shape: (181,)
-        # Simulando Phi como uma matriz 40x181 (substitua pelos dados reais)
-        self.Phi = self.data.values   # Exemplo; use self.data.values para dados reais
+        self.N_rot = np.arange(2e4, 6e4, 1e3)
+        self.Mass = np.arange(3, 21.1, 0.1)
+
+        self.Phi = self.data.values   
 
     def interpolate(self):
         phi_flat = self.Phi.ravel(order='F')
@@ -53,8 +52,8 @@ a1 = (P1*(A1/Lc) * (float(lut([n_exp + 1e3, m_exp])) - float(lut([n_exp - 1e3, m
 a2 = (P1*(A1/Lc) * (float(lut([n_exp, m_exp + 0.1])) - float(lut([n_exp, m_exp - 0.1])))/(2 * 0.1)) *1e3
 a3 = -(A1/Lc) * 1e3
 a4 = (C**2)/(2)
-a5 = -((0.5*kv*500)/(2 * np.sqrt(p_exp * 1000 - P_out * 1000))) * (C**2)/(2)
-a6 = (-kv * np.sqrt(p_exp * 1000 - P_out * 1000)) * (C**2)/(2)
+a5 = -((0.5*kv*500)/(2 * np.sqrt(p_exp * 1000 - P_out * 1000))) * (C**2)/2
+a6 = (-kv * np.sqrt(p_exp * 1000 - P_out * 1000)) * (C**2)/2
 
 Ac = np.array([[a2, a3],[a4, a5]])
 Bc = np.array([[a1, 0 ],[0, a6]])
