@@ -42,6 +42,7 @@ kv = 0.38
 P1 = 4.5
 P_out = 5
 C = 479
+Vp = 2
 
 m_exp = 8.5
 p_exp = 6.9
@@ -51,12 +52,14 @@ n_exp = 38500.0
 a1 = (P1*(A1/Lc) * (float(lut([n_exp + 1e3, m_exp])) - float(lut([n_exp - 1e3, m_exp])))/(2 * 1e3)) *1e3
 a2 = (P1*(A1/Lc) * (float(lut([n_exp, m_exp + 0.1])) - float(lut([n_exp, m_exp - 0.1])))/(2 * 0.1)) *1e3
 a3 = -(A1/Lc) * 1e3
-a4 = (C**2)/(2)
-a5 = -((0.5*kv*500)/(2 * np.sqrt(p_exp * 1000 - P_out * 1000))) * (C**2)/2
-a6 = (-kv * np.sqrt(p_exp * 1000 - P_out * 1000)) * (C**2)/2
+a4 = (C**2)/Vp
+a5 = -((a_exp*kv*500)/(2 * np.sqrt(p_exp - P_out)* 1000)) * (C**2)/Vp
+a6 = (-kv * np.sqrt(p_exp - P_out)* 1000) * (C**2)/Vp
 
-Ac = np.array([[a2, a3],[a4, a5]])
-Bc = np.array([[a1, 0 ],[0, a6]])
+Ac = np.array([[a2, a3],
+               [a4, a5]])
+Bc = np.array([[a1, 0 ],
+               [0, a6]])
 Cc = np.eye(2)
 Dc = np.zeros((2,2))
 
