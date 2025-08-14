@@ -47,10 +47,10 @@ Vp = 2
 m_exp = 8.5
 p_exp = 6.9
 a_exp = 0.5
-n_exp = 38500.0
+n_exp = 3.85
 
-a1 = (P1*(A1/Lc) * (float(lut([n_exp + 1e3, m_exp])) - float(lut([n_exp - 1e3, m_exp])))/(2 * 1e3)) *1e3
-a2 = (P1*(A1/Lc) * (float(lut([n_exp, m_exp + 0.1])) - float(lut([n_exp, m_exp - 0.1])))/(2 * 0.1)) *1e3
+a1 = (P1*(A1/Lc) * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/(2 * 1e3)) *1e3
+a2 = (P1*(A1/Lc) * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1])))/(2 * 0.1)) *1e3
 a3 = -(A1/Lc) * 1e3
 a4 = (C**2)/Vp
 a5 = -((a_exp*kv*500)/(2 * np.sqrt(p_exp - P_out)* 1000)) * (C**2)/Vp
@@ -79,7 +79,7 @@ scaling = 1
 A, B, C, D = ctrl.ssdata(sys_d)
 
 A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
-B_ = np.block([[np.zeros((Nu,Nu))], [np.eye(Nu)]])
+B_ = np.block([[B], [np.eye(Nu)]])
 
 Qtil = np.array([6e-3, 6e-4])
 Rtil = np.array([4e-5, 2e-12])
@@ -134,7 +134,7 @@ Su = np.block([[psi, np.zeros((Nx*p, Nx*p))],
 
 K = 130
 x0 = np.array([[8.5], [6.9]])
-u0 = np.array([[0.5], [38500]])
+u0 = np.array([[0.5], [3.85]])
 xk = x0.copy()
 uk = u0.copy()
 x_k = np.block([[xk], [uk]])
@@ -143,10 +143,10 @@ z_k = np.block([x_k.T, -yspk.T])
 
 yMax = np.tile(np.array([[12.3], [9.3]]), (p,1))
 yMin = np.tile(np.array([[5.5], [5.27]]), (p,1))
-uMax = np.tile(np.array([[0.65], [5e4]]), (p,1))
-uMin = np.tile(np.array([[0.35], [27e3]]), (p,1))
-deltaUMax = np.tile(np.array([[0.1], [2500]]), (p,1))
-deltaUMin = np.tile(np.array([[-0.1], [-2500]]), (p,1))
+uMax = np.tile(np.array([[0.65], [5]]), (p,1))
+uMin = np.tile(np.array([[0.35], [2.7]]), (p,1))
+deltaUMax = np.tile(np.array([[0.1], [0.25]]), (p,1))
+deltaUMin = np.tile(np.array([[-0.1], [-0.25]]), (p,1))
 
 w = np.block([[yMax], [-yMin], [uMax], [-uMin], [deltaUMax], [-deltaUMin]])
 
@@ -157,6 +157,8 @@ z_k_store_mpc = np.zeros((Nx*p + Nx+Nu, K))
 for j in range(K):
     deltaU = cp.Variable((Nu*m, 1))
     cost = cp.quad_form(deltaU, H) + 2 * z_k @ F @ deltaU
+    temp2 = Su @ z_k.T
+    temp = Su @ z_k.T + w
     constraints = [G @ deltaU <= Su @ z_k.T + w]
     prob = cp.Problem(cp.Minimize(cost), constraints)
     prob.solve(solver="OSQP", verbose=True)
