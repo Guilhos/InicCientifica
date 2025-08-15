@@ -44,22 +44,23 @@ P_out = 5
 C = 479
 Vp = 2
 
-m_exp = 8.5
-p_exp = 6.9
+m_exp = 7.745
+p_exp = 6.662
 a_exp = 0.5
 n_exp = 3.85
 
-a1 = P1*A1/Lc * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/2 / 1e3 *1e3
-a2 = (P1*(A1/Lc) * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1])))/(2 * 0.1)) *1e3
-a3 = -(A1/Lc) * 1e3
-a4 = (C**2)/Vp/1e6
-a5 = -((a_exp*kv*500)/(np.sqrt(p_exp - P_out)* 1000)) * (C**2)/Vp/1e6
-a6 = (-kv * np.sqrt(p_exp - P_out)* 1000) * (C**2)/Vp/1e6
+a11 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
+a12 = -A1 / Lc * 1e3
+a21 = C**2 / Vp
+a22 = -C**2 / Vp * a_exp*kv*500 / np.sqrt((p_exp - P_out) * 1000)
 
-Ac = np.array([[a2, a3],
-               [a4, a5]])
-Bc = np.array([[a1, 0 ],
-               [0, a6]])
+b12 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
+b21 = -C**2 / Vp * kv * np.sqrt((p_exp - P_out) * 1000)
+
+Ac = np.array([[a11, a12],
+               [a21, a22]])
+Bc = np.array([[0, b12 ],
+               [b21, 0]])
 Cc = np.eye(2)
 Dc = np.zeros((2,2))
 
@@ -123,15 +124,15 @@ H = (H + H.T) / 2  # Garantir que H é simétrico
 F = np.block([[psi.T @ Q @ theta], [Q @ theta]])
 
 G = np.block([[theta],
-               [-theta],
-                 #[thetaU],
-                   #[-thetaU],
-                     [np.eye(Nx*p, Nu*m)],
-                       [-np.eye(Nx*p, Nu*m)]])
-Su = np.block([[psi, np.zeros((Nx*p, Nx*p))],
-                [-psi, np.zeros((Nx*p, Nx*p))],
-                #[psiu, np.zeros((Nx*p, Nx*p))],
+                [-theta],
+                #[thetaU],
+                #[-thetaU],
+                [np.eye(Nx*p, Nu*m)],
+                [-np.eye(Nx*p, Nu*m)]])
+Su = np.block([[-psi, np.zeros((Nx*p, Nx*p))],
+                [psi, np.zeros((Nx*p, Nx*p))],
                 #[-psiu, np.zeros((Nx*p, Nx*p))],
+                #[psiu, np.zeros((Nx*p, Nx*p))],
                 [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx*p))],
                 [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx*p))]])
 
@@ -151,14 +152,13 @@ yMin = np.tile(np.array([[5.5], [5.27]]), (p,1))
 uMax = np.tile(np.array([[0.65], [5]]), (p,1))
 uMin = np.tile(np.array([[0.35], [2.7]]), (p,1))
 deltaUMax = np.tile(np.array([[0.1], [0.25]]), (p,1))
-deltaUMin = np.tile(np.array([[-0.1], [-0.25]]), (p,1))
 
 w = np.block([[yMax],
-               [-yMin],
-                 #[uMax],
-                   #[-uMin],
-                     [deltaUMax],
-                       [-deltaUMin]])
+                [-yMin],
+                #[uMax],
+                #[-uMin],
+                [deltaUMax],
+                [-deltaUMax]])
 
 deltaU_value = np.zeros((Nu*p, K))
 deltaU_mpc = np.zeros((2, K))
