@@ -8,6 +8,7 @@ from scipy.linalg import block_diag
 import os
 output_dir = "MPC_to_NN/MPCvsNN - Sistema Compressão/output_figures"
 os.makedirs(output_dir, exist_ok=True)
+np.set_printoptions(precision=2)
 
 # Sistema
 
@@ -52,7 +53,7 @@ n_exp = 3.85
 a11 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
 a12 = -A1 / Lc * 1e3
 a21 = C**2 / Vp
-a22 = -C**2 / Vp * a_exp*kv*500 / np.sqrt((p_exp - P_out) * 1000)
+a22 = -C**2 / Vp * a_exp * kv * 500 / 2 / np.sqrt((p_exp - P_out) * 1000)
 
 b12 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
 b21 = -C**2 / Vp * kv * np.sqrt((p_exp - P_out) * 1000)
@@ -125,66 +126,169 @@ F = np.block([[psi.T @ Q @ theta], [Q @ theta]])
 
 G = np.block([[theta],
                 [-theta],
-                #[thetaU],
-                #[-thetaU],
+                [thetaU],
+                [-thetaU],
                 [np.eye(Nx*p, Nu*m)],
                 [-np.eye(Nx*p, Nu*m)]])
 Su = np.block([[-psi, np.zeros((Nx*p, Nx*p))],
                 [psi, np.zeros((Nx*p, Nx*p))],
-                #[-psiu, np.zeros((Nx*p, Nx*p))],
-                #[psiu, np.zeros((Nx*p, Nx*p))],
+                [-psiu, np.zeros((Nx*p, Nx*p))],
+                [psiu, np.zeros((Nx*p, Nx*p))],
                 [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx*p))],
                 [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx*p))]])
 
 # Simulação do MPC
 
-K = 130
-x0 = np.array([[8.5], [6.9]])
-u0 = np.array([[0.5], [3.85]])
+K = 100
+x_op = np.array([[m_exp], [p_exp]])    
+u_op = np.array([[a_exp], [n_exp]])   
+y_op = x_op.copy()
+
+x0 = np.array([[7.745], [6.662]]) - x_op
+u0 = np.array([[0.5], [3.85]]) - u_op
+
 xk = x0.copy()
 uk = u0.copy()
+
 x_k = np.block([[xk], [uk]])
-yspk = (np.ones((p, Nx)) * [8.5, 6.9]).reshape(-1, 1)
+yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
 z_k = np.block([x_k.T, -yspk.T])
 
-yMax = np.tile(np.array([[12.3], [9.3]]), (p,1))
-yMin = np.tile(np.array([[5.5], [5.27]]), (p,1))
-uMax = np.tile(np.array([[0.65], [5]]), (p,1))
-uMin = np.tile(np.array([[0.35], [2.7]]), (p,1))
+yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
+yMin = np.tile(np.array([[5.5], [5.27]]) - y_op, (p,1))
+uMax = np.tile(np.array([[0.65], [5]]) - u_op, (p,1))
+uMin = np.tile(np.array([[0.35], [2.7]]) - u_op, (p,1))
 deltaUMax = np.tile(np.array([[0.1], [0.25]]), (p,1))
+deltaUMin = np.tile(np.array([[-0.1], [-0.25]]), (p,1))
 
 w = np.block([[yMax],
                 [-yMin],
-                #[uMax],
-                #[-uMin],
+                [uMax],
+                [-uMin],
                 [deltaUMax],
-                [-deltaUMax]])
+                [-deltaUMin]])
 
-deltaU_value = np.zeros((Nu*p, K))
-deltaU_mpc = np.zeros((2, K))
-z_k_store_mpc = np.zeros((Nx*p + Nx+Nu, K))
+deltaU_value = np.zeros((K, Nu*m))
+deltaU_mpc = np.zeros((K, Nu))
+z_k_store_mpc = np.zeros((K, Nx*p + Nx+Nu))
 
 for j in range(K):
     deltaU = cp.Variable((Nu*m, 1))
     cost = cp.quad_form(deltaU, H) + 2 * z_k @ F @ deltaU
-    temp2 = Su @ z_k.T
-    temp = Su @ z_k.T + w
+    Su_zk = Su @ z_k.T
+    Su_zk_w = Su @ z_k.T + w
     constraints = [G @ deltaU <= Su @ z_k.T + w]
     prob = cp.Problem(cp.Minimize(cost), constraints)
     prob.solve(solver="OSQP", verbose=True)
 
-    deltaU_value[:, j] = deltaU.value
+    deltaU_value[j, :] = deltaU.value.flatten()
 
-    deltaU_mpc[:, j] = deltaU_value[:2, j]
+    deltaU_mpc[j, :] = deltaU_value[j, :2]
 
-    uk = uk + np.eye(2) @ deltaU_mpc[:, j].reshape(-1,1)
+    uk = uk + np.eye(2) @ deltaU_mpc[j, :].reshape(-1,1)
     xk = A @ xk + B @ uk
     x_k = np.block([[xk], [uk]])
 
-    yspk = (np.ones((p, Nx)) * [8.5, 6.9]).reshape(-1, 1)  # Depois alterar o setpoint
+    if j == 0:
+        yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
+    elif j == 10:
+        yspk = (np.ones((p, Nx)) * ([8.5, 7] - y_op.flatten())).reshape(-1, 1)
+    elif j == 40:
+        yspk = (np.ones((p, Nx)) * ([7, 6] - y_op.flatten())).reshape(-1, 1)
+
     z_k = np.block([x_k.T, -yspk.T])
 
-    z_k_store_mpc[:, j] = z_k
+    z_k_store_mpc[j, :] = z_k
 
+# Simulação da rede neural implicita
+
+iters = 100
+y_store = np.zeros((Nx*p*Nu*m, iters))
+phi_store = np.zeros((Nx*p*Nu*m, iters))
+res_store = np.zeros((Nx*p*Nu*m, iters))
+res_norm = np.zeros(iters)
+sign_store = np.ones((Nx*p*Nu*m, iters))
+
+S = Su + G @ np.linalg.inv(H) @ F.T
+D = np.eye(Nx*p*Nu*m) - G @ np.linalg.inv(H) @ G.T
+
+xk = x0.copy()
+uk = u0.copy()
+x_k = np.block([[xk], [uk]])
+yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
+z_k = - np.block([x_k.T, -yspk.T])
+
+c_MPC = S @ z_k.T + w
+zeta = -c_MPC
+
+y0 = np.zeros((Nx*p*Nu*m, 1))
+phi = np.zeros((Nx*p*Nu*m, 1))
+for g in range(Nx*p):
+    if y0[g] >= 0:
+        phi[g] = y0[g]
+    else:
+        phi[g] = 0
+
+residual = y0 - D @ phi - zeta
+K_gain = 2
+y = y0.copy()
+
+deltaU_nn = np.zeros((K, Nu))
+deltaU_ramp = np.zeros((K, Nu*m))
+z_k_store_nn = np.zeros((K, Nx*p + Nx+Nu))
+res_norm_store = np.zeros((K, iters))
+
+for k in range(K):
+    for i in range(iters):
+        c_MPC = S @ z_k.T + w
+        zeta = -c_MPC
+        y_store[:, i:i+Nx] = y
+        phi_store[:, i:i+Nx] = phi
+        res_store[:, i:i+Nx] = residual
+        ykp1 = D @ phi + zeta + K_gain * residual
+
+        for g in range(Nx*p*Nu*m):
+            if ykp1[g] > 0:
+                phi[g] = ykp1[g]
+            else:
+                phi[g] = 0
+                sign_store[g, i] = -1
+        
+        y = ykp1.copy()
+        residual = y - D @ phi - zeta
+        res_norm[i] = np.linalg.norm(residual)
+        res_norm_store[j, i] = np.linalg.norm(y - D @ phi - zeta)
+
+    y_ramp = ykp1.copy()
+    deltaU_ramp[k, :] = (-np.linalg.inv(H) @ (F.T @ z_k.T + G.T @ phi)).flatten()
+
+    deltaU_nn[k, :] = deltaU_ramp[k, :2]
+    uk = uk + np.eye(2) @ deltaU_nn[k, :].reshape(-1,1)
+    print(k)
+    xk = A @ xk + B @ uk
+    x_k = np.block([[xk], [uk]])
+
+    if j == 0:
+        yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
+    elif j == 10:
+        yspk = (np.ones((p, Nx)) * ([8.5, 7] - y_op.flatten())).reshape(-1, 1)
+    elif j == 40:
+        yspk = (np.ones((p, Nx)) * ([7, 6] - y_op.flatten())).reshape(-1, 1)
+
+    z_k = np.block([x_k.T, -yspk.T])
+    z_k_store_nn[k, :] = z_k
+
+# Plots
+plt.figure(figsize=(10, 6))
+plt.plot(z_k_store_mpc[:, 0] + x_op[0], label='Massa (kg)')
+plt.plot(z_k_store_nn[:, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
+
+plt.figure(figsize=(10, 6))
+plt.plot(z_k_store_mpc[:, 1] + x_op[1], label='Pressão (MPa)')
+plt.plot(z_k_store_nn[:, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'pressao_mpc.png'))
 
 print('tes')
