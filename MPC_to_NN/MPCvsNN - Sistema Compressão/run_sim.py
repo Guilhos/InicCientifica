@@ -202,7 +202,7 @@ for j in range(K):
 
 # Simulação da rede neural implicita
 
-iters = 100
+iters = 10
 y_store = np.zeros((Nx*p*Nu*m, iters))
 phi_store = np.zeros((Nx*p*Nu*m, iters))
 res_store = np.zeros((Nx*p*Nu*m, iters))
@@ -230,7 +230,7 @@ for g in range(Nx*p):
         phi[g] = 0
 
 residual = y0 - D @ phi - zeta
-K_gain = 2
+K_gain = 1.5
 y = y0.copy()
 
 deltaU_nn = np.zeros((K, Nu))
@@ -279,15 +279,16 @@ for k in range(K):
     z_k_store_nn[k, :] = z_k
 
 # Plots
+t = np.arange(K) * Ts
 plt.figure(figsize=(10, 6))
-plt.plot(z_k_store_mpc[:, 0] + x_op[0], label='Massa (kg)')
-plt.plot(z_k_store_nn[:, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
+plt.plot(t,z_k_store_mpc[:, 0] + x_op[0], label='Massa (kg)')
+plt.plot(t,z_k_store_nn[:, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(z_k_store_mpc[:, 1] + x_op[1], label='Pressão (MPa)')
-plt.plot(z_k_store_nn[:, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
+plt.plot(t,z_k_store_mpc[:, 1] + x_op[1], label='Pressão (MPa)')
+plt.plot(t,z_k_store_nn[:, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'pressao_mpc.png'))
 
