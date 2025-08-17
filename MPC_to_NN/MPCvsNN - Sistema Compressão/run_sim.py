@@ -50,12 +50,14 @@ p_exp = 6.662
 a_exp = 0.5
 n_exp = 3.85
 
+# dm/dt = a11 * m + a12 * p + b12 * n
 a11 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
 a12 = -A1 / Lc * 1e3
+b12 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
+
+# dp/dt = a21 * m + a22 * p + b21 * a
 a21 = C**2 / Vp
 a22 = -C**2 / Vp * a_exp * kv * 500 / 2 / np.sqrt((p_exp - P_out) * 1000)
-
-b12 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
 b21 = -C**2 / Vp * kv * np.sqrt((p_exp - P_out) * 1000)
 
 Ac = np.array([[a11, a12],
@@ -84,7 +86,7 @@ A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
 Qtil = np.array([6e-3, 6e-4])
-Rtil = np.array([4e-5, 2e-12])
+Rtil = np.array([4e-5, 1e-3])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
 R = np.diag(np.kron(np.ones(m), Rtil))
@@ -195,6 +197,8 @@ for j in range(K):
         yspk = (np.ones((p, Nx)) * ([8.5, 7] - y_op.flatten())).reshape(-1, 1)
     elif j == 40:
         yspk = (np.ones((p, Nx)) * ([7, 6] - y_op.flatten())).reshape(-1, 1)
+    elif j == 70:
+        yspk = (np.ones((p, Nx)) * ([7.5, 6.5] - y_op.flatten())).reshape(-1, 1)
 
     z_k = np.block([x_k.T, -yspk.T])
 
@@ -202,7 +206,7 @@ for j in range(K):
 
 # Simulação da rede neural implicita
 
-iters = 10
+iters = 1
 y_store = np.zeros((Nx*p*Nu*m, iters))
 phi_store = np.zeros((Nx*p*Nu*m, iters))
 res_store = np.zeros((Nx*p*Nu*m, iters))
@@ -230,7 +234,7 @@ for g in range(Nx*p):
         phi[g] = 0
 
 residual = y0 - D @ phi - zeta
-K_gain = 1.5
+K_gain = 0
 y = y0.copy()
 
 deltaU_nn = np.zeros((K, Nu))
@@ -282,14 +286,32 @@ for k in range(K):
 t = np.arange(K) * Ts
 plt.figure(figsize=(10, 6))
 plt.plot(t,z_k_store_mpc[:, 0] + x_op[0], label='Massa (kg)')
+plt.plot(t,-z_k_store_mpc[:, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
 plt.plot(t,z_k_store_nn[:, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
+plt.plot(t,np.ones((K,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
+plt.plot(t,np.ones((K,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
 plt.plot(t,z_k_store_mpc[:, 1] + x_op[1], label='Pressão (MPa)')
+plt.plot(t,-z_k_store_mpc[:, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
 plt.plot(t,z_k_store_nn[:, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
+plt.plot(t,np.ones((K,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
+plt.plot(t,np.ones((K,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'pressao_mpc.png'))
+
+plt.figure(figsize=(10, 6))
+plt.plot(t, z_k_store_mpc[:, 2] + u_op[0], label='Abertura da válvula (m)')
+plt.plot(t, z_k_store_nn[:, 2] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'abertura_valvula_mpc.png'))
+
+plt.figure(figsize=(10, 6))
+plt.plot(t, z_k_store_mpc[:, 3] + u_op[1], label='Rotação do motor (rpm)')
+plt.plot(t, z_k_store_nn[:, 3] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'rotacao_motor_mpc.png'))
 
 print('tes')
