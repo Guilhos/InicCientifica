@@ -188,7 +188,7 @@ for j in range(K):
     deltaU_mpc[j, :] = deltaU_value[j, :2]
 
     uk = uk + np.eye(2) @ deltaU_mpc[j, :].reshape(-1,1)
-    xk = A @ xk + B @ uk
+    xk = A @ xk + B @ [[1,0],[0,10000]] @ uk 
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
