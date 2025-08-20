@@ -85,7 +85,7 @@ A, B, C, D = ctrl.ssdata(sys_d)
 A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
-Qtil = np.array([6e-3, 56e-4])
+Qtil = np.array([6e-3, 5e-3])
 Rtil = np.array([4e-5, 1e-3])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
@@ -124,7 +124,7 @@ for i in range(p):
 
 H = theta.T @ Q @ theta + R
 H = (H + H.T) / 2  # Garantir que H é simétrico
-F = np.block([[psi.T @ Q @ theta], [-Q @ theta]])
+F = np.block([[psi.T @ Q @ theta], [np.kron(np.ones((p,1)), np.eye(Nx)).T @ -Q @ theta]])
 
 G = np.block([[theta],
                 [-theta],
@@ -132,12 +132,12 @@ G = np.block([[theta],
                 [-thetaU],
                 [np.eye(Nx*p, Nu*m)],
                 [-np.eye(Nx*p, Nu*m)]])
-Su = np.block([[-psi, np.zeros((Nx*p, Nx*p))],
-                [psi, np.zeros((Nx*p, Nx*p))],
-                [-psiu, np.zeros((Nx*p, Nx*p))],
-                [psiu, np.zeros((Nx*p, Nx*p))],
-                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx*p))],
-                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx*p))]])
+Su = np.block([[-psi, np.zeros((Nx*p, Nx))],
+                [psi, np.zeros((Nx*p, Nx))],
+                [-psiu, np.zeros((Nx*p, Nx))],
+                [psiu, np.zeros((Nx*p, Nx))],
+                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))],
+                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))]])
 
 # Simulação do MPC
 
@@ -153,7 +153,7 @@ xk = x0.copy()
 uk = u0.copy()
 
 x_k = np.block([[xk], [uk]])
-yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
+yspk = np.array([[7.745], [6.662]])
 z_k = np.block([x_k.T, yspk.T])
 
 yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
@@ -172,7 +172,7 @@ w = np.block([[yMax],
 
 deltaU_value = np.zeros((K, Nu*m))
 deltaU_mpc = np.zeros((K, Nu))
-z_k_store_mpc = np.zeros((K, Nx*p + Nx+Nu))
+z_k_store_mpc = np.zeros((K, Nx+Nx+Nu))
 
 for j in range(K):
     deltaU = cp.Variable((Nu*m, 1))
@@ -192,13 +192,13 @@ for j in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[7.745], [6.662]])
     elif j == 10:
-        yspk = (np.ones((p, Nx)) * ([8.5, 7] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[8.5], [7]])
     elif j == 40:
-        yspk = (np.ones((p, Nx)) * ([7, 6] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[7], [6]])
     elif j == 70:
-        yspk = (np.ones((p, Nx)) * ([7.5, 6.5] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[7.5], [6.5]])
 
     z_k = np.block([x_k.T, yspk.T])
 
