@@ -153,7 +153,7 @@ xk = x0.copy()
 uk = u0.copy()
 
 x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]])
+yspk = np.array([[7.745], [6.662]] - y_op)
 z_k = np.block([x_k.T, yspk.T])
 
 yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
@@ -192,13 +192,13 @@ for j in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = np.array([[7.745], [6.662]])
+        yspk = np.array([[7.745], [6.662]]- y_op)
     elif j == 10:
-        yspk = np.array([[8.5], [7]])
+        yspk = np.array([[8.5], [7]]- y_op)
     elif j == 40:
-        yspk = np.array([[7], [6]])
+        yspk = np.array([[7], [6]]- y_op)
     elif j == 70:
-        yspk = np.array([[7.5], [6.5]])
+        yspk = np.array([[7.5], [6.5]]- y_op)
 
     z_k = np.block([x_k.T, yspk.T])
 
@@ -219,8 +219,8 @@ D = np.eye(Nx*p*Nu*m) - G @ np.linalg.inv(H) @ G.T
 xk = x0.copy()
 uk = u0.copy()
 x_k = np.block([[xk], [uk]])
-yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
-z_k = - np.block([x_k.T, -yspk.T])
+yspk = np.array([[7.745], [6.662]] - y_op)
+z_k = - np.block([x_k.T, yspk.T])
 
 c_MPC = S @ z_k.T + w
 zeta = -c_MPC
@@ -234,12 +234,12 @@ for g in range(Nx*p):
         phi[g] = 0
 
 residual = y0 - D @ phi - zeta
-K_gain = 0
+K_gain = 1
 y = y0.copy()
 
 deltaU_nn = np.zeros((K, Nu))
 deltaU_ramp = np.zeros((K, Nu*m))
-z_k_store_nn = np.zeros((K, Nx*p + Nx+Nu))
+z_k_store_nn = np.zeros((K, Nx + Nx + Nu))
 res_norm_store = np.zeros((K, iters))
 
 for k in range(K):
@@ -273,13 +273,15 @@ for k in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[7.745], [6.662]] - y_op)
     elif j == 10:
-        yspk = (np.ones((p, Nx)) * ([8.5, 7] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[8.5], [7]] - y_op)
     elif j == 40:
-        yspk = (np.ones((p, Nx)) * ([7, 6] - y_op.flatten())).reshape(-1, 1)
+        yspk = np.array([[7], [6]] - y_op)
+    elif j == 70:
+        yspk = np.array([[7.5], [6.5]] - y_op)
 
-    z_k = np.block([x_k.T, -yspk.T])
+    z_k = np.block([x_k.T, yspk.T])
     z_k_store_nn[k, :] = z_k
 
 # Plots
