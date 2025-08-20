@@ -51,14 +51,14 @@ a_exp = 0.5
 n_exp = 3.85
 
 # dm/dt = a11 * m + a12 * p + b12 * n
-a11 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
-a12 = -A1 / Lc * 1e3
-b12 = P1 * A1/Lc * 1e3 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
+a11 = P1 * A1/Lc * 1e6 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
+a12 = -A1 / Lc * 1e6 
+b12 = P1 * A1/Lc * 1e10 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
 
 # dp/dt = a21 * m + a22 * p + b21 * a
-a21 = C**2 / Vp
-a22 = -C**2 / Vp * a_exp * kv * 500 / 2 / np.sqrt((p_exp - P_out) * 1000)
-b21 = -C**2 / Vp * kv * np.sqrt((p_exp - P_out) * 1000)
+a21 = C**2 / Vp/1e6
+a22 = -C**2 / Vp * a_exp * kv *500 / np.sqrt((p_exp - P_out) * 1000)/1e6
+b21 = -C**2 / Vp * kv * np.sqrt((p_exp - P_out) * 1000)/1e6
 
 Ac = np.array([[a11, a12],
                [a21, a22]])
@@ -85,7 +85,7 @@ A, B, C, D = ctrl.ssdata(sys_d)
 A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
-Qtil = np.array([6e-3, 6e-4])
+Qtil = np.array([6e-3, 56e-4])
 Rtil = np.array([4e-5, 1e-3])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
@@ -124,7 +124,7 @@ for i in range(p):
 
 H = theta.T @ Q @ theta + R
 H = (H + H.T) / 2  # Garantir que H é simétrico
-F = np.block([[psi.T @ Q @ theta], [Q @ theta]])
+F = np.block([[psi.T @ Q @ theta], [-Q @ theta]])
 
 G = np.block([[theta],
                 [-theta],
@@ -154,7 +154,7 @@ uk = u0.copy()
 
 x_k = np.block([[xk], [uk]])
 yspk = (np.ones((p, Nx)) * ([7.745, 6.662] - y_op.flatten())).reshape(-1, 1)
-z_k = np.block([x_k.T, -yspk.T])
+z_k = np.block([x_k.T, yspk.T])
 
 yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
 yMin = np.tile(np.array([[5.5], [5.27]]) - y_op, (p,1))
@@ -188,7 +188,7 @@ for j in range(K):
     deltaU_mpc[j, :] = deltaU_value[j, :2]
 
     uk = uk + np.eye(2) @ deltaU_mpc[j, :].reshape(-1,1)
-    xk = A @ xk + B @ [[1,0],[0,10000]] @ uk 
+    xk = A @ xk + B @ uk 
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
@@ -200,7 +200,7 @@ for j in range(K):
     elif j == 70:
         yspk = (np.ones((p, Nx)) * ([7.5, 6.5] - y_op.flatten())).reshape(-1, 1)
 
-    z_k = np.block([x_k.T, -yspk.T])
+    z_k = np.block([x_k.T, yspk.T])
 
     z_k_store_mpc[j, :] = z_k
 
@@ -286,7 +286,7 @@ for k in range(K):
 t = np.arange(K) * Ts
 plt.figure(figsize=(10, 6))
 plt.plot(t,z_k_store_mpc[:, 0] + x_op[0], label='Massa (kg)')
-plt.plot(t,-z_k_store_mpc[:, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,z_k_store_mpc[:, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
 plt.plot(t,z_k_store_nn[:, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
 plt.plot(t,np.ones((K,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
 plt.plot(t,np.ones((K,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
@@ -295,7 +295,7 @@ plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
 plt.plot(t,z_k_store_mpc[:, 1] + x_op[1], label='Pressão (MPa)')
-plt.plot(t,-z_k_store_mpc[:, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,z_k_store_mpc[:, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
 plt.plot(t,z_k_store_nn[:, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
 plt.plot(t,np.ones((K,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
 plt.plot(t,np.ones((K,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
@@ -305,12 +305,16 @@ plt.savefig(os.path.join(output_dir, 'pressao_mpc.png'))
 plt.figure(figsize=(10, 6))
 plt.plot(t, z_k_store_mpc[:, 2] + u_op[0], label='Abertura da válvula (m)')
 plt.plot(t, z_k_store_nn[:, 2] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
+plt.plot(t, np.ones((K,1)) * (uMax[0] + u_op[0]), label='Abertura Max', linestyle=':', color='black')
+plt.plot(t, np.ones((K,1)) * (uMin[0] + u_op[0]), label='Abertura Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'abertura_valvula_mpc.png'))
 
 plt.figure(figsize=(10, 6))
 plt.plot(t, z_k_store_mpc[:, 3] + u_op[1], label='Rotação do motor (rpm)')
 plt.plot(t, z_k_store_nn[:, 3] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
+plt.plot(t, np.ones((K,1)) * (uMax[1] + u_op[1]), label='Rotação Max', linestyle=':', color='black')
+plt.plot(t, np.ones((K,1)) * (uMin[1] + u_op[1]), label='Rotação Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'rotacao_motor_mpc.png'))
 
