@@ -71,19 +71,9 @@ class SystemDEQ(nn.Module):
         # Rede f(z, u) 
         self.f_network = nn.Sequential(
             nn.Linear(hidden_dim + input_dim, hidden_dim),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim)
         )
         self.output_layer = nn.Linear(hidden_dim, output_dim)
@@ -101,7 +91,7 @@ INPUT_DIM = U_train.shape[1]
 HIDDEN_DIM = 32
 OUTPUT_DIM = Y_train.shape[1]
 LEARNING_RATE = 5e-4 # Taxa de aprendizado reduzida para maior estabilidade
-EPOCHS = 500
+EPOCHS = 1000
 
 # --- Instanciar o modelo, a função de perda e o otimizador ---
 model = SystemDEQ(input_dim=INPUT_DIM, hidden_dim=HIDDEN_DIM, output_dim=OUTPUT_DIM)

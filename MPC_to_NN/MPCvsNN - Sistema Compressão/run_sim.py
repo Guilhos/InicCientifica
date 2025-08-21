@@ -206,7 +206,7 @@ for j in range(K):
 
 # Simulação da rede neural implicita
 
-iters = 1
+iters = 50
 y_store = np.zeros((Nx*p*Nu*m, iters))
 phi_store = np.zeros((Nx*p*Nu*m, iters))
 res_store = np.zeros((Nx*p*Nu*m, iters))
@@ -234,7 +234,7 @@ for g in range(Nx*p):
         phi[g] = 0
 
 residual = y0 - D @ phi - zeta
-K_gain = 1
+K_gain = 1.1 * np.eye(Nx*p*Nu*m)
 y = y0.copy()
 
 deltaU_nn = np.zeros((K, Nu))
@@ -249,7 +249,7 @@ for k in range(K):
         y_store[:, i:i+Nx] = y
         phi_store[:, i:i+Nx] = phi
         res_store[:, i:i+Nx] = residual
-        ykp1 = D @ phi + zeta + K_gain * residual
+        ykp1 = D @ phi + zeta + K_gain @ residual
 
         for g in range(Nx*p*Nu*m):
             if ykp1[g] > 0:
