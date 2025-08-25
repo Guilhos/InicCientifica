@@ -85,8 +85,8 @@ A, B, C, D = ctrl.ssdata(sys_d)
 A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
-Qtil = np.array([6e-3, 5e-3])
-Rtil = np.array([4e-5, 1e-3])
+Qtil = np.array([2, 2])
+Rtil = np.array([2, 2])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
 R = np.diag(np.kron(np.ones(m), Rtil))
@@ -206,7 +206,7 @@ for j in range(K):
 
 # Simulação da rede neural implicita
 
-iters = 50
+iters = 25
 y_store = np.zeros((Nx*p*Nu*m, iters))
 phi_store = np.zeros((Nx*p*Nu*m, iters))
 res_store = np.zeros((Nx*p*Nu*m, iters))
@@ -215,6 +215,7 @@ sign_store = np.ones((Nx*p*Nu*m, iters))
 
 S = Su + G @ np.linalg.inv(H) @ F.T
 D = np.eye(Nx*p*Nu*m) - G @ np.linalg.inv(H) @ G.T
+D_norm = np.linalg.norm(D, 2)
 
 xk = x0.copy()
 uk = u0.copy()
@@ -286,38 +287,40 @@ for k in range(K):
 
 # Plots
 t = np.arange(K) * Ts
+nT = len(t)
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:, 0] + x_op[0], label='Massa (kg)')
-plt.plot(t,z_k_store_mpc[:, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
-plt.plot(t,np.ones((K,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
-plt.plot(t,np.ones((K,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
+plt.plot(t,z_k_store_mpc[:nT, 0] + x_op[0], label='Massa (kg)')
+plt.plot(t,z_k_store_mpc[:nT, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,z_k_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
+plt.plot(t,np.ones((nT,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
+plt.plot(t,np.ones((nT,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:, 1] + x_op[1], label='Pressão (MPa)')
-plt.plot(t,z_k_store_mpc[:, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
-plt.plot(t,np.ones((K,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
-plt.plot(t,np.ones((K,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
+plt.plot(t,z_k_store_mpc[:nT, 1] + x_op[1], label='Pressão (MPa)')
+plt.plot(t,z_k_store_mpc[:nT, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,z_k_store_nn[:nT, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
+plt.plot(t,np.ones((nT,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
+plt.plot(t,np.ones((nT,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'pressao_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t, z_k_store_mpc[:, 2] + u_op[0], label='Abertura da válvula (m)')
-plt.plot(t, z_k_store_nn[:, 2] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
-plt.plot(t, np.ones((K,1)) * (uMax[0] + u_op[0]), label='Abertura Max', linestyle=':', color='black')
-plt.plot(t, np.ones((K,1)) * (uMin[0] + u_op[0]), label='Abertura Min', linestyle=':', color='black')
+plt.plot(t, z_k_store_mpc[:nT, 2] + u_op[0], label='Abertura da válvula (m)')
+plt.plot(t, z_k_store_nn[:nT, 2] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
+plt.plot(t, np.ones((nT,1)) * (uMax[0] + u_op[0]), label='Abertura Max', linestyle=':', color='black')
+plt.plot(t, np.ones((nT,1)) * (uMin[0] + u_op[0]), label='Abertura Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'abertura_valvula_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t, z_k_store_mpc[:, 3] + u_op[1], label='Rotação do motor (rpm)')
-plt.plot(t, z_k_store_nn[:, 3] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
-plt.plot(t, np.ones((K,1)) * (uMax[1] + u_op[1]), label='Rotação Max', linestyle=':', color='black')
-plt.plot(t, np.ones((K,1)) * (uMin[1] + u_op[1]), label='Rotação Min', linestyle=':', color='black')
+plt.plot(t, z_k_store_mpc[:nT, 3] + u_op[1], label='Rotação do motor (rpm)')
+plt.plot(t, z_k_store_nn[:nT, 3] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
+plt.plot(t, np.ones((nT,1)) * (uMax[1] + u_op[1]), label='Rotação Max', linestyle=':', color='black')
+plt.plot(t, np.ones((nT,1)) * (uMin[1] + u_op[1]), label='Rotação Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'rotacao_motor_mpc.png'))
 
-print('tes')
+D_eigvals = np.linalg.eigvals(D)
+print(D_norm)
