@@ -86,7 +86,7 @@ A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
 Qtil = np.array([2, 2])
-Rtil = np.array([2, 2])
+Rtil = np.array([10, 10])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
 R = np.diag(np.kron(np.ones(m), Rtil))
@@ -214,8 +214,73 @@ res_norm = np.zeros(iters)
 sign_store = np.ones((Nx*p*Nu*m, iters))
 
 S = Su + G @ np.linalg.inv(H) @ F.T
-D = np.eye(Nx*p*Nu*m) - G @ np.linalg.inv(H) @ G.T
+D = np.eye(Nx*p*6) - G @ np.linalg.inv(H) @ G.T
 D_norm = np.linalg.norm(D, 2)
+
+def compute_D(QtilA, RtilA, pA, mA, A_, B_, C_, Cu, Su, theta, psi, thetaU, psiu, Nx, Nu):
+
+    psiA = np.block([[C_ @ A_]])
+    for i in range(pA-1):
+        psiA = np.vstack((psiA, psiA[-2:] @ A_))
+
+    thetaA = np.zeros((Nx*pA, Nu*mA))
+    for i in range(pA):
+        for j in range(i+1):
+            if (j+1)*Nu <= Nu*mA:
+                thetaA[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = C_ @ np.linalg.matrix_power(A_, i-j) @ B_
+            else:
+                continue
+    
+    # PsiU
+    psiuA = np.block([[Cu @ A_]])
+    for i in range(pA-1):
+        psiuA = np.vstack((psiu, psiu[-2:] @ A_))
+
+    # ThetaU
+    thetaUA = np.zeros((Nx*pA, Nu*mA))
+    for i in range(pA):
+        for j in range(i+1):
+            if (j+1)*Nu <= Nu*mA:
+                thetaUA[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = Cu @ np.linalg.matrix_power(A_, i-j) @ B_
+            else:
+                continue
+
+    # Q e R ampliados
+    QA = np.diag(np.kron(np.ones(pA), QtilA))
+    RA = np.diag(np.kron(np.ones(mA), RtilA))
+
+    # Matriz H e F
+    HA = thetaA.T @ QA @ thetaA + RA
+    HA = (HA + HA.T) / 2  # garantir simetria
+    FA = np.block([[psiA.T @ QA @ thetaA],
+                  [np.kron(np.ones((pA,1)), np.eye(Nx)).T @ -QA @ thetaA]])
+
+    # Matriz G
+    GA = np.block([[thetaA],
+                  [-thetaA],
+                  [thetaUA],
+                  [-thetaUA],
+                  [np.eye(Nx*pA, Nu*mA)],
+                  [-np.eye(Nx*pA, Nu*mA)]])
+
+    # Matriz D
+    DA = np.eye(Nx*pA*6) - GA @ np.linalg.inv(HA) @ GA.T
+    D_normA = np.linalg.norm(DA, 2)
+    eigvalsA = np.linalg.eigvals(DA)
+    return D_normA, eigvalsA
+
+# Teste de diferentes sintonias
+Qtil_testes = [[1, 1], [1e3, 1e3], [1e6, 1e6], [1e9, 1e9]]
+Rtil_testes = [[1, 1], [1e3, 1e3], [1e6, 1e6], [1e9, 1e9]]
+p_testes = [10, 15, 20]
+m_testes = [3, 5, 10]
+
+for QtilA in Qtil_testes:
+    for RtilA in Rtil_testes:
+        for pA in p_testes:
+            for mA in m_testes:
+                D_normA, eigvals = compute_D(QtilA, RtilA, pA, mA, A_, B_, C_, Cu, Su, theta, psi, thetaU, psiu, Nx, Nu)
+                print(f"{QtilA};{RtilA};{pA};{mA};{D_normA}\";\"{max(np.real(eigvals))}")
 
 xk = x0.copy()
 uk = u0.copy()
@@ -269,7 +334,7 @@ for k in range(K):
 
     deltaU_nn[k, :] = deltaU_ramp[k, :2]
     uk = uk + np.eye(2) @ deltaU_nn[k, :].reshape(-1,1)
-    print(k)
+    #print(k)
     xk = A @ xk + B @ uk
     x_k = np.block([[xk], [uk]])
 

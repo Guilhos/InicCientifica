@@ -74,70 +74,45 @@ sys_d = ctrl.c2d(sys_c, Ts, method='zoh')
 
 # Configurações do MPC
 
-p = 12
-m = 3
+n = 5
 Nx = 2
 Nu = 2
 scaling = 1
 
 A, B, C, D = ctrl.ssdata(sys_d)
 
-A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
-B_ = np.block([[B], [np.eye(Nu)]])
-
 Qtil = np.array([2, 2])
 Rtil = np.array([2, 2])
 
-Q = np.diag(np.kron(np.ones(p), Qtil))
-R = np.diag(np.kron(np.ones(m), Rtil))
-
-C_ = np.block([Cc, np.zeros((Nu,Nu))])
-Cu = np.block([np.zeros((Nx,Nx)), np.eye(Nu)])
+Q = np.diag(np.kron(np.ones(n), Qtil))
+R = np.diag(np.kron(np.ones(n), Rtil))
 
 # Psi
-psi = np.block([[C_ @ A_]])
-for i in range(p-1):
-    psi = np.vstack((psi, psi[-2:] @ A_))
+psi = np.block([[C @ A]])
+for i in range(n-1):
+    psi = np.vstack((psi, psi[-2:] @ A))
 
 # Theta
-theta = np.zeros((Nx*p, Nu*m))
-for i in range(p):
+theta = np.zeros((Nx*n, Nu*n))
+for i in range(n):
     for j in range(i+1):
-        if (j+1)*Nu <= Nu*m:
-            theta[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = C_ @ np.linalg.matrix_power(A_, i-j) @ B_
-        else:
-            continue
-
-# PsiU
-psiu = np.block([[Cu @ A_]])
-for i in range(p-1):
-    psiu = np.vstack((psiu, psiu[-2:] @ A_))
-
-# ThetaU
-thetaU = np.zeros((Nx*p, Nu*m))
-for i in range(p):
-    for j in range(i+1):
-        if (j+1)*Nu <= Nu*m:
-            thetaU[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = Cu @ np.linalg.matrix_power(A_, i-j) @ B_
+        if (j+1)*Nu <= Nu*n:
+            theta[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = C @ np.linalg.matrix_power(A, i-j) @ B
         else:
             continue
 
 H = theta.T @ Q @ theta + R
 H = (H + H.T) / 2  # Garantir que H é simétrico
-F = np.block([[psi.T @ Q @ theta], [np.kron(np.ones((p,1)), np.eye(Nx)).T @ -Q @ theta]])
+F = psi.T @ Q @ theta
 
 G = np.block([[theta],
                 [-theta],
-                [thetaU],
-                [-thetaU],
-                [np.eye(Nx*p, Nu*m)],
-                [-np.eye(Nx*p, Nu*m)]])
-Su = np.block([[-psi, np.zeros((Nx*p, Nx))],
-                [psi, np.zeros((Nx*p, Nx))],
-                [-psiu, np.zeros((Nx*p, Nx))],
-                [psiu, np.zeros((Nx*p, Nx))],
-                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))],
-                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))]])
+                [np.eye(Nx*n, Nu*n)],
+                [-np.eye(Nx*n, Nu*n)]])
+Su = np.block([[-psi],
+                [psi],
+                [np.zeros((Nx*n, Nx))],
+                [np.zeros((Nx*n, Nx))]])
 
 # Simulação do MPC
 
@@ -146,113 +121,84 @@ x_op = np.array([[m_exp], [p_exp]])
 u_op = np.array([[a_exp], [n_exp]])   
 y_op = x_op.copy()
 
-x0 = np.array([[7.745], [6.662]]) - x_op
-u0 = np.array([[0.5], [3.85]]) - u_op
+x0 = np.array([[7], [6]]) - x_op
 
 xk = x0.copy()
-uk = u0.copy()
 
-x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]] - y_op)
-z_k = np.block([x_k.T, yspk.T])
-
-yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
-yMin = np.tile(np.array([[5.5], [5.27]]) - y_op, (p,1))
-uMax = np.tile(np.array([[0.65], [5]]) - u_op, (p,1))
-uMin = np.tile(np.array([[0.35], [2.7]]) - u_op, (p,1))
-deltaUMax = np.tile(np.array([[0.1], [0.25]]), (p,1))
-deltaUMin = np.tile(np.array([[-0.1], [-0.25]]), (p,1))
+yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (n,1))
+yMin = np.tile(np.array([[5.5], [5.27]]) - y_op, (n,1))
+uMax = np.tile(np.array([[0.65], [5]]) - u_op, (n,1))
+uMin = np.tile(np.array([[0.35], [2.7]]) - u_op, (n,1))
 
 w = np.block([[yMax],
                 [-yMin],
                 [uMax],
-                [-uMin],
-                [deltaUMax],
-                [-deltaUMin]])
+                [-uMin]])
 
-deltaU_value = np.zeros((K, Nu*m))
-deltaU_mpc = np.zeros((K, Nu))
-z_k_store_mpc = np.zeros((K, Nx+Nx+Nu))
+U_value = np.zeros((K, Nu*n))
+U_mpc = np.zeros((K, Nu))
+xk_store_mpc = np.zeros((K, Nx))
 
 for j in range(K):
-    deltaU = cp.Variable((Nu*m, 1))
-    cost = cp.quad_form(deltaU, H) + 2 * z_k @ F @ deltaU
-    Su_zk = Su @ z_k.T
-    Su_zk_w = Su @ z_k.T + w
-    constraints = [G @ deltaU <= Su @ z_k.T + w]
+    u = cp.Variable((Nu*n, 1))
+    cost = cp.quad_form(u, H) + 2 * xk.T @ F @ u
+    constraints = [G @ u <= Su @ xk + w]
     prob = cp.Problem(cp.Minimize(cost), constraints)
     prob.solve(solver="OSQP", verbose=True)
 
-    deltaU_value[j, :] = deltaU.value.flatten()
+    U_value[j, :] = u.value.flatten()
 
-    deltaU_mpc[j, :] = deltaU_value[j, :2]
+    U_mpc[j, :] = U_value[j, :2]
 
-    uk = uk + np.eye(2) @ deltaU_mpc[j, :].reshape(-1,1)
-    xk = A @ xk + B @ uk 
-    x_k = np.block([[xk], [uk]])
+    xk = A @ xk + B @ U_mpc[j, :].reshape(-1,1)
 
-    if j == 0:
-        yspk = np.array([[7.745], [6.662]]- y_op)
-    elif j == 10:
-        yspk = np.array([[8.5], [7]]- y_op)
-    elif j == 40:
-        yspk = np.array([[7], [6]]- y_op)
-    elif j == 70:
-        yspk = np.array([[7.5], [6.5]]- y_op)
-
-    z_k = np.block([x_k.T, yspk.T])
-
-    z_k_store_mpc[j, :] = z_k
+    xk_store_mpc[j, :] = xk.flatten()
 
 # Simulação da rede neural implicita
 
 iters = 25
-y_store = np.zeros((Nx*p*Nu*m, iters))
-phi_store = np.zeros((Nx*p*Nu*m, iters))
-res_store = np.zeros((Nx*p*Nu*m, iters))
+y_store = np.zeros((Nx*n*Nu*Nx, iters))
+phi_store = np.zeros((Nx*n*Nu*Nx, iters))
+res_store = np.zeros((Nx*n*Nu*Nx, iters))
 res_norm = np.zeros(iters)
-sign_store = np.ones((Nx*p*Nu*m, iters))
+sign_store = np.ones((Nx*n*Nu*Nx, iters))
 
 S = Su + G @ np.linalg.inv(H) @ F.T
-D = np.eye(Nx*p*Nu*m) - G @ np.linalg.inv(H) @ G.T
+D = np.eye(Nx*n*Nu*Nx) - G @ np.linalg.inv(H) @ G.T
 D_norm = np.linalg.norm(D, 2)
 
 xk = x0.copy()
-uk = u0.copy()
-x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]] - y_op)
-z_k = - np.block([x_k.T, yspk.T])
 
-c_MPC = S @ z_k.T + w
+c_MPC = S @ xk + w
 zeta = -c_MPC
 
-y0 = np.zeros((Nx*p*Nu*m, 1))
-phi = np.zeros((Nx*p*Nu*m, 1))
-for g in range(Nx*p):
+y0 = np.zeros((Nx*n*Nu*Nx, 1))
+phi = np.zeros((Nx*n*Nu*Nx, 1))
+for g in range(Nx*n):
     if y0[g] >= 0:
         phi[g] = y0[g]
     else:
         phi[g] = 0
 
 residual = y0 - D @ phi - zeta
-K_gain = 1.1 * np.eye(Nx*p*Nu*m)
+K_gain = 1.1 * np.eye(Nx*n*Nu*Nx)
 y = y0.copy()
 
-deltaU_nn = np.zeros((K, Nu))
-deltaU_ramp = np.zeros((K, Nu*m))
-z_k_store_nn = np.zeros((K, Nx + Nx + Nu))
+U_nn = np.zeros((K, Nu))
+U_ramp = np.zeros((K, Nu*n))
+xk_store_nn = np.zeros((K, Nx))
 res_norm_store = np.zeros((K, iters))
 
 for k in range(K):
     for i in range(iters):
-        c_MPC = S @ z_k.T + w
+        c_MPC = S @ xk + w
         zeta = -c_MPC
         y_store[:, i:i+Nx] = y
         phi_store[:, i:i+Nx] = phi
         res_store[:, i:i+Nx] = residual
         ykp1 = D @ phi + zeta + K_gain @ residual
 
-        for g in range(Nx*p*Nu*m):
+        for g in range(Nx*n*Nu*Nx):
             if ykp1[g] > 0:
                 phi[g] = ykp1[g]
             else:
@@ -265,62 +211,48 @@ for k in range(K):
         res_norm_store[j, i] = np.linalg.norm(y - D @ phi - zeta)
 
     y_ramp = ykp1.copy()
-    deltaU_ramp[k, :] = (-np.linalg.inv(H) @ (F.T @ z_k.T + G.T @ phi)).flatten()
+    U_ramp[k, :] = (-np.linalg.inv(H) @ (F.T @ xk + G.T @ phi)).flatten()
 
-    deltaU_nn[k, :] = deltaU_ramp[k, :2]
-    uk = uk + np.eye(2) @ deltaU_nn[k, :].reshape(-1,1)
+    U_nn[k, :] = U_ramp[k, :2]
     print(k)
-    xk = A @ xk + B @ uk
-    x_k = np.block([[xk], [uk]])
+    xk = A @ xk + B @ U_nn[k, :].reshape(-1,1)
 
-    if j == 0:
-        yspk = np.array([[7.745], [6.662]] - y_op)
-    elif j == 10:
-        yspk = np.array([[8.5], [7]] - y_op)
-    elif j == 40:
-        yspk = np.array([[7], [6]] - y_op)
-    elif j == 70:
-        yspk = np.array([[7.5], [6.5]] - y_op)
-
-    z_k = np.block([x_k.T, yspk.T])
-    z_k_store_nn[k, :] = z_k
+    xk_store_nn[k, :] = xk.flatten()
 
 # Plots
 t = np.arange(K) * Ts
 nT = len(t)
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:nT, 0] + x_op[0], label='Massa (kg)')
-plt.plot(t,z_k_store_mpc[:nT, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
+plt.plot(t,xk_store_mpc[:nT, 0] + x_op[0], label='Massa (kg)')
+plt.plot(t,xk_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
 plt.plot(t,np.ones((nT,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
 plt.plot(t,np.ones((nT,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'reg_massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:nT, 1] + x_op[1], label='Pressão (MPa)')
-plt.plot(t,z_k_store_mpc[:nT, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:nT, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
+plt.plot(t,xk_store_mpc[:nT, 1] + x_op[1], label='Pressão (MPa)')
+plt.plot(t,xk_store_nn[:nT, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
 plt.plot(t,np.ones((nT,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
 plt.plot(t,np.ones((nT,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'pressao_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'reg_pressao_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t, z_k_store_mpc[:nT, 2] + u_op[0], label='Abertura da válvula (m)')
-plt.plot(t, z_k_store_nn[:nT, 2] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
+plt.plot(t, U_mpc[:nT, 0] + u_op[0], label='Abertura da válvula (m)')
+plt.plot(t, U_nn[:nT, 0] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
 plt.plot(t, np.ones((nT,1)) * (uMax[0] + u_op[0]), label='Abertura Max', linestyle=':', color='black')
 plt.plot(t, np.ones((nT,1)) * (uMin[0] + u_op[0]), label='Abertura Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'abertura_valvula_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'reg_abertura_valvula_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t, z_k_store_mpc[:nT, 3] + u_op[1], label='Rotação do motor (rpm)')
-plt.plot(t, z_k_store_nn[:nT, 3] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
+plt.plot(t, U_mpc[:nT, 1] + u_op[1], label='Rotação do motor (rpm)')
+plt.plot(t, U_nn[:nT, 1] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
 plt.plot(t, np.ones((nT,1)) * (uMax[1] + u_op[1]), label='Rotação Max', linestyle=':', color='black')
 plt.plot(t, np.ones((nT,1)) * (uMin[1] + u_op[1]), label='Rotação Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'rotacao_motor_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'reg_rotacao_motor_mpc.png'))
 
 D_eigvals = np.linalg.eigvals(D)
 print(D_norm)
