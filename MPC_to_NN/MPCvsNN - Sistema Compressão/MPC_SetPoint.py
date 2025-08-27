@@ -86,7 +86,7 @@ A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
 Qtil = np.array([2, 2])
-Rtil = np.array([10, 10])
+Rtil = np.array([2, 2])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
 R = np.diag(np.kron(np.ones(m), Rtil))
@@ -214,7 +214,11 @@ res_norm = np.zeros(iters)
 sign_store = np.ones((Nx*p*Nu*m, iters))
 
 S = Su + G @ np.linalg.inv(H) @ F.T
+
 D = np.eye(Nx*p*6) - G @ np.linalg.inv(H) @ G.T
+Ka = G @ np.linalg.inv(H) @ G.T
+invH = np.linalg.inv(H)
+D = 0.5*(D + D.T)
 D_norm = np.linalg.norm(D, 2)
 
 def compute_D(QtilA, RtilA, pA, mA, A_, B_, C_, Cu, Su, theta, psi, thetaU, psiu, Nx, Nu):
