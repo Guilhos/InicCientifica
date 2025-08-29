@@ -97,7 +97,7 @@ Cu = np.block([np.zeros((Nx,Nx)), np.eye(Nu)])
 # Psi
 psi = np.block([[C_ @ A_]])
 for i in range(p-1):
-    psi = np.vstack((psi, psi[-2:] @ A_))
+    psi = np.vstack((psi, psi[-Nx:] @ A_))
 
 # Theta
 theta = np.zeros((Nx*p, Nu*m))
