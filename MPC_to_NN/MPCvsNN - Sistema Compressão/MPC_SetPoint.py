@@ -8,7 +8,7 @@ from scipy.linalg import block_diag
 import os
 output_dir = "MPC_to_NN/MPCvsNN - Sistema Compressão/output_figures"
 os.makedirs(output_dir, exist_ok=True)
-np.set_printoptions(precision=2)
+np.set_printoptions(precision=5)
 
 # Sistema
 
@@ -40,20 +40,51 @@ lut = interp.interpolate()
 A1 = (2.6)*(10**-3)
 Lc = 2
 kv = 0.38
-P1 = 4.5
-P_out = 5
 C = 479
 Vp = 2
 
-m_exp = 7.745
-p_exp = 6.662
-a_exp = 0.5
-n_exp = 3.85
+m_max, m_min = 12.3, 5.5
+p_max, p_min = 9.3, 5.27
+a_max, a_min = 0.65, 0.35
+n_max, n_min = 5, 2.7
+
+def normalize(value, var):
+    if var == 'm':
+        min_val, max_val = m_min, m_max
+    elif var == 'p':
+        min_val, max_val = p_min, p_max
+    elif var == 'a':
+        min_val, max_val = a_min, a_max
+    elif var == 'n':
+        min_val, max_val = n_min, n_max
+
+    return (value - min_val) / (max_val - min_val)
+
+def denormalize(norm_value, var):
+    if var == 'm':
+        min_val, max_val = m_min, m_max
+    elif var == 'p':
+        min_val, max_val = p_min, p_max
+    elif var == 'a':
+        min_val, max_val = a_min, a_max
+    elif var == 'n':
+        min_val, max_val = n_min, n_max
+
+    return norm_value * (max_val - min_val) + min_val
+
+
+P1 = normalize(4.5, 'p')
+P_out = normalize(5, 'p')
+
+m_exp = normalize(7.745, 'm')
+p_exp = normalize(6.662, 'p')
+a_exp = normalize(0.5, 'a')
+n_exp = normalize(3.85, 'n')
 
 # dm/dt = a11 * m + a12 * p + b12 * n
-a11 = P1 * A1/Lc * 1e6 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
+a11 = P1 * A1/Lc * 1e6 * (float(lut([n_exp*1e4 , denormalize(m_exp,'m') + 0.1])) - float(lut([denormalize(n_exp,'n')*1e4 , denormalize(m_exp,'m') - 0.1]))) / 2 / 0.1
 a12 = -A1 / Lc * 1e6 
-b12 = P1 * A1/Lc * 1e10 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
+b12 = P1 * A1/Lc * 1e10 * (float(lut([denormalize(n_exp,'n')*1e4 + 1e3, denormalize(m_exp,'m')])) - float(lut([denormalize(n_exp,'n')*1e4  - 1e3, denormalize(m_exp,'m')])))/ 2 / 1e3
 
 # dp/dt = a21 * m + a22 * p + b21 * a
 a21 = C**2 / Vp/1e6
@@ -146,22 +177,22 @@ x_op = np.array([[m_exp], [p_exp]])
 u_op = np.array([[a_exp], [n_exp]])   
 y_op = x_op.copy()
 
-x0 = np.array([[7.745], [6.662]]) - x_op
-u0 = np.array([[0.5], [3.85]]) - u_op
+x0 = np.array([[normalize(7.745, 'm')], [normalize(6.662,'p')]]) - x_op
+u0 = np.array([[normalize(0.5,'a')], [normalize(3.85,'n')]]) - u_op
 
 xk = x0.copy()
 uk = u0.copy()
 
 x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]] - y_op)
+yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]] - y_op)
 z_k = np.block([x_k.T, yspk.T])
 
-yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
-yMin = np.tile(np.array([[5.5], [5.27]]) - y_op, (p,1))
-uMax = np.tile(np.array([[0.65], [5]]) - u_op, (p,1))
-uMin = np.tile(np.array([[0.35], [2.7]]) - u_op, (p,1))
-deltaUMax = np.tile(np.array([[0.1], [0.25]]), (p,1))
-deltaUMin = np.tile(np.array([[-0.1], [-0.25]]), (p,1))
+yMax = np.tile(np.array([[normalize(12.3,'m')], [normalize(9.3,'p')]]) - y_op, (p,1))
+yMin = np.tile(np.array([[normalize(5.5,'m')], [normalize(5.27,'p')]]) - y_op, (p,1))
+uMax = np.tile(np.array([[normalize(0.65,'a')], [normalize(5,'n')]]) - u_op, (p,1))
+uMin = np.tile(np.array([[normalize(0.35,'a')], [normalize(2.7,'n')]]) - u_op, (p,1))
+deltaUMax = np.tile(np.array([[normalize(0.1,'a')], [normalize(0.25,'n')]]), (p,1))
+deltaUMin = np.tile(np.array([[normalize(0.1,'a')], [normalize(-0.25,'n')]]), (p,1))
 
 w = np.block([[yMax],
                 [-yMin],
@@ -192,13 +223,13 @@ for j in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = np.array([[7.745], [6.662]]- y_op)
+        yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]]- y_op)
     elif j == 10:
-        yspk = np.array([[8.5], [7]]- y_op)
+        yspk = np.array([[normalize(8.5,'m')], [normalize(7,'p')]]- y_op)
     elif j == 40:
-        yspk = np.array([[7], [6]]- y_op)
+        yspk = np.array([[normalize(7,'m')], [normalize(6,'p')]]- y_op)
     elif j == 70:
-        yspk = np.array([[7.5], [6.5]]- y_op)
+        yspk = np.array([[normalize(7.5,'m')], [normalize(6.5,'p')]]- y_op)
 
     z_k = np.block([x_k.T, yspk.T])
 
@@ -221,75 +252,10 @@ invH = np.linalg.inv(H)
 D = 0.5*(D + D.T)
 D_norm = np.linalg.norm(D, 2)
 
-def compute_D(QtilA, RtilA, pA, mA, A_, B_, C_, Cu, Su, theta, psi, thetaU, psiu, Nx, Nu):
-
-    psiA = np.block([[C_ @ A_]])
-    for i in range(pA-1):
-        psiA = np.vstack((psiA, psiA[-2:] @ A_))
-
-    thetaA = np.zeros((Nx*pA, Nu*mA))
-    for i in range(pA):
-        for j in range(i+1):
-            if (j+1)*Nu <= Nu*mA:
-                thetaA[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = C_ @ np.linalg.matrix_power(A_, i-j) @ B_
-            else:
-                continue
-    
-    # PsiU
-    psiuA = np.block([[Cu @ A_]])
-    for i in range(pA-1):
-        psiuA = np.vstack((psiu, psiu[-2:] @ A_))
-
-    # ThetaU
-    thetaUA = np.zeros((Nx*pA, Nu*mA))
-    for i in range(pA):
-        for j in range(i+1):
-            if (j+1)*Nu <= Nu*mA:
-                thetaUA[i*Nu:(i+1)*Nu,j*Nu:(j+1)*Nu] = Cu @ np.linalg.matrix_power(A_, i-j) @ B_
-            else:
-                continue
-
-    # Q e R ampliados
-    QA = np.diag(np.kron(np.ones(pA), QtilA))
-    RA = np.diag(np.kron(np.ones(mA), RtilA))
-
-    # Matriz H e F
-    HA = thetaA.T @ QA @ thetaA + RA
-    HA = (HA + HA.T) / 2  # garantir simetria
-    FA = np.block([[psiA.T @ QA @ thetaA],
-                  [np.kron(np.ones((pA,1)), np.eye(Nx)).T @ -QA @ thetaA]])
-
-    # Matriz G
-    GA = np.block([[thetaA],
-                  [-thetaA],
-                  [thetaUA],
-                  [-thetaUA],
-                  [np.eye(Nx*pA, Nu*mA)],
-                  [-np.eye(Nx*pA, Nu*mA)]])
-
-    # Matriz D
-    DA = np.eye(Nx*pA*6) - GA @ np.linalg.inv(HA) @ GA.T
-    D_normA = np.linalg.norm(DA, 2)
-    eigvalsA = np.linalg.eigvals(DA)
-    return D_normA, eigvalsA
-
-# Teste de diferentes sintonias
-Qtil_testes = [[1, 1], [1e3, 1e3], [1e6, 1e6], [1e9, 1e9]]
-Rtil_testes = [[1, 1], [1e3, 1e3], [1e6, 1e6], [1e9, 1e9]]
-p_testes = [10, 15, 20]
-m_testes = [3, 5, 10]
-
-for QtilA in Qtil_testes:
-    for RtilA in Rtil_testes:
-        for pA in p_testes:
-            for mA in m_testes:
-                D_normA, eigvals = compute_D(QtilA, RtilA, pA, mA, A_, B_, C_, Cu, Su, theta, psi, thetaU, psiu, Nx, Nu)
-                print(f"{QtilA};{RtilA};{pA};{mA};{D_normA}\";\"{max(np.real(eigvals))}")
-
 xk = x0.copy()
 uk = u0.copy()
 x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]] - y_op)
+yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]] - y_op)
 z_k = - np.block([x_k.T, yspk.T])
 
 c_MPC = S @ z_k.T + w
@@ -343,13 +309,13 @@ for k in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = np.array([[7.745], [6.662]] - y_op)
+        yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]]- y_op)
     elif j == 10:
-        yspk = np.array([[8.5], [7]] - y_op)
+        yspk = np.array([[normalize(8.5,'m')], [normalize(7,'p')]]- y_op)
     elif j == 40:
-        yspk = np.array([[7], [6]] - y_op)
+        yspk = np.array([[normalize(7,'m')], [normalize(6,'p')]]- y_op)
     elif j == 70:
-        yspk = np.array([[7.5], [6.5]] - y_op)
+        yspk = np.array([[normalize(7.5,'m')], [normalize(6.5,'p')]]- y_op)
 
     z_k = np.block([x_k.T, yspk.T])
     z_k_store_nn[k, :] = z_k
@@ -358,11 +324,11 @@ for k in range(K):
 t = np.arange(K) * Ts
 nT = len(t)
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:nT, 0] + x_op[0], label='Massa (kg)')
-plt.plot(t,z_k_store_mpc[:nT, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
-plt.plot(t,np.ones((nT,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
-plt.plot(t,np.ones((nT,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
+plt.plot(t,denormalize(z_k_store_mpc[:nT, 0] + x_op[0],'m'), label='Massa (kg)')
+plt.plot(t,denormalize(z_k_store_mpc[:nT, 4] + x_op[0],'m'), label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,denormalize(z_k_store_nn[:nT, 0] + x_op[0],'m'), label='Massa NN (kg)', linestyle='--')
+plt.plot(t,np.ones((nT,1)) * (denormalize(yMax[0] + x_op[0],'m')), label='Massa Max', linestyle=':', color='black')
+plt.plot(t,np.ones((nT,1)) * (denormalize(yMin[0] + x_op[0],'m')), label='Massa Min', linestyle=':', color='black')
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'massa_mpc.png'))
 
