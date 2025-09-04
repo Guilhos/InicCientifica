@@ -6,7 +6,7 @@ import casadi as ca
 import control as ctrl
 from scipy.linalg import block_diag
 import os
-output_dir = "MPC_to_NN/MPCvsNN - Sistema Compressão/output_figures/zero"
+output_dir = "MPC_to_NN/MPCvsNN - Sistema Compressão/output_figures/normalizado"
 os.makedirs(output_dir, exist_ok=True)
 np.set_printoptions(precision=5)
 
@@ -42,29 +42,52 @@ Lc = 2
 kv = 0.38
 C = 479
 Vp = 2
+P1 = 4.5
+P_out = 5
 
 m_max, m_min = 12.3, 5.5
 p_max, p_min = 9.3, 5.27
 a_max, a_min = 0.65, 0.35
 n_max, n_min = 5, 2.7
 
-P1 = 4.5
-P_out = 5
+def normalize(value, var):
+    if var == 'm':
+        min_val, max_val = m_min, m_max
+    elif var == 'p':
+        min_val, max_val = p_min, p_max
+    elif var == 'a':
+        min_val, max_val = a_min, a_max
+    elif var == 'n':
+        min_val, max_val = n_min, n_max
 
-m_exp = 7.745
-p_exp = 6.662
-a_exp = 0.5
-n_exp = 3.85
+    return (value - min_val) / (max_val - min_val)
+
+def denormalize(norm_value, var):
+    if var == 'm':
+        min_val, max_val = m_min, m_max
+    elif var == 'p':
+        min_val, max_val = p_min, p_max
+    elif var == 'a':
+        min_val, max_val = a_min, a_max
+    elif var == 'n':
+        min_val, max_val = n_min, n_max
+
+    return norm_value * (max_val - min_val) + min_val
+
+m_exp = normalize(7.745, 'm')
+p_exp = normalize(6.662, 'p')
+a_exp = normalize(0.5, 'a')
+n_exp = normalize(3.85, 'n')
 
 # dm/dt = a11 * m + a12 * p + b12 * n
-a11 = P1 * A1/Lc * 1e6 * (float(lut([n_exp*1e4 , m_exp + 0.1])) - float(lut([n_exp*1e4 , m_exp - 0.1]))) / 2 / 0.1
-a12 = -A1 / Lc * 1e6 
-b12 = P1 * A1/Lc * 1e10 * (float(lut([n_exp*1e4 + 1e3, m_exp])) - float(lut([n_exp*1e4  - 1e3, m_exp])))/ 2 / 1e3
+a11 = P1 * A1/Lc * 1e6 * (float(lut([denormalize(n_exp,'n')*1e4, denormalize(m_exp,'m') + 0.1])) - float(lut([denormalize(n_exp,'n')*1e4, denormalize(m_exp,'m') - 0.1]))) / 2 / 0.1
+a12 = -A1 * (p_max - p_min) * 1e6 / Lc / (m_max - m_min)
+b12 = P1 * A1/Lc * 1e10 * (n_max - n_min) / (m_max - m_min) * (float(lut([denormalize(n_exp,'n')*1e4 + 1e3, denormalize(m_exp,'m')])) - float(lut([denormalize(n_exp,'n')*1e4  - 1e3, denormalize(m_exp,'m')]))) / 2 / 1e3
 
 # dp/dt = a21 * m + a22 * p + b21 * a
-a21 = C**2 / Vp / 1e6
-a22 = -C**2 / Vp * a_exp * kv *500 / np.sqrt((p_exp - P_out) * 1000)/1e6
-b21 = -C**2 / Vp * kv * np.sqrt((p_exp - P_out) * 1000)/1e6
+a21 = C**2 * (m_max - m_min) / (p_max - p_min) / Vp / 1e6
+a22 = -C**2 / Vp * denormalize(a_exp,'a') * kv * 500 / np.sqrt((denormalize(p_exp,'p') - P_out) * 1000) / 1e6
+b21 = -C**2 / (p_max - p_min) / Vp * (a_max - a_min) * kv * np.sqrt((denormalize(p_exp,'p') - P_out) * 1000) / 1e6
 
 Ac = np.array([[a11, a12],
                [a21, a22]])
@@ -91,8 +114,8 @@ A, B, C, D = ctrl.ssdata(sys_d)
 A_ = np.block([[A,B],[np.zeros((Nu,Nu)), np.eye(Nu)]])
 B_ = np.block([[B], [np.eye(Nu)]])
 
-Qtil = np.array([2, 2])
-Rtil = np.array([2, 2])
+Qtil = np.array([10, 10])
+Rtil = np.array([10, 1])
 
 Q = np.diag(np.kron(np.ones(p), Qtil))
 R = np.diag(np.kron(np.ones(m), Rtil))
@@ -137,13 +160,15 @@ G = np.block([[theta],
                 [thetaU],
                 [-thetaU],
                 [np.eye(Nx*p, Nu*m)],
-                [-np.eye(Nx*p, Nu*m)]])
+                [-np.eye(Nx*p, Nu*m)]
+                ])
 Su = np.block([[-psi, np.zeros((Nx*p, Nx))],
                 [psi, np.zeros((Nx*p, Nx))],
                 [-psiu, np.zeros((Nx*p, Nx))],
                 [psiu, np.zeros((Nx*p, Nx))],
                 [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))],
-                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))]])
+                [np.zeros((Nx*p, Nx*Nu)), np.zeros((Nx*p, Nx))]
+                ])
 
 # Simulação do MPC
 
@@ -152,29 +177,30 @@ x_op = np.array([[m_exp], [p_exp]])
 u_op = np.array([[a_exp], [n_exp]])   
 y_op = x_op.copy()
 
-x0 = np.array([[7.745], [6.662]]) - x_op
-u0 = np.array([[0.5], [3.85]]) - u_op
+x0 = np.array([[normalize(7.745, 'm')], [normalize(6.662,'p')]]) - x_op
+u0 = np.array([[normalize(0.5,'a')], [normalize(3.85,'n')]]) - u_op
 
 xk = x0.copy()
 uk = u0.copy()
 
 x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]] - y_op)
+yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]] - y_op)
 z_k = np.block([x_k.T, yspk.T])
 
-yMax = np.tile(np.array([[12.3], [9.3]]) - y_op, (p,1))
-yMin = np.tile(np.array([[5.5], [5.27]]) - y_op, (p,1))
-uMax = np.tile(np.array([[0.65], [5]]) - u_op, (p,1))
-uMin = np.tile(np.array([[0.35], [2.7]]) - u_op, (p,1))
-deltaUMax = np.tile(np.array([[0.1], [0.25]]), (p,1))
-deltaUMin = np.tile(np.array([[-0.1], [-0.25]]), (p,1))
+yMax = np.tile(np.array([[normalize(12.3,'m')], [normalize(9.3,'p')]]) - y_op, (p,1))
+yMin = np.tile(np.array([[normalize(5.5,'m')], [normalize(5.27,'p')]]) - y_op, (p,1))
+uMax = np.tile(np.array([[normalize(0.65,'a')], [normalize(5,'n')]]) - u_op, (p,1))
+uMin = np.tile(np.array([[normalize(0.35,'a')], [normalize(2.7,'n')]]) - u_op, (p,1))
+deltaUMax = np.tile(np.array([[normalize(0.1+a_min,'a')], [normalize(0.25+n_min,'n')]]), (p,1))
+deltaUMin = np.tile(np.array([[normalize(-0.1+a_min,'a')], [normalize(-0.25+n_min,'n')]]), (p,1))
 
 w = np.block([[yMax],
                 [-yMin],
                 [uMax],
                 [-uMin],
                 [deltaUMax],
-                [-deltaUMin]])
+                [-deltaUMin]
+                ])
 
 deltaU_value = np.zeros((K, Nu*m))
 deltaU_mpc = np.zeros((K, Nu))
@@ -198,13 +224,13 @@ for j in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = np.array([[7.745], [6.662]]- y_op)
+        yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]]- y_op)
     elif j == 10:
-        yspk = np.array([[8.5], [7]]- y_op)
+        yspk = np.array([[normalize(8.5,'m')], [normalize(7,'p')]]- y_op)
     elif j == 40:
-        yspk = np.array([[7], [6]]- y_op)
+        yspk = np.array([[normalize(7,'m')], [normalize(6,'p')]]- y_op)
     elif j == 70:
-        yspk = np.array([[7.5], [6.5]]- y_op)
+        yspk = np.array([[normalize(7.5,'m')], [normalize(6.5,'p')]]- y_op)
 
     z_k = np.block([x_k.T, yspk.T])
 
@@ -230,7 +256,7 @@ D_norm = np.linalg.norm(D, 2)
 xk = x0.copy()
 uk = u0.copy()
 x_k = np.block([[xk], [uk]])
-yspk = np.array([[7.745], [6.662]] - y_op)
+yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]] - y_op)
 z_k = - np.block([x_k.T, yspk.T])
 
 c_MPC = S @ z_k.T + w
@@ -284,13 +310,13 @@ for k in range(K):
     x_k = np.block([[xk], [uk]])
 
     if j == 0:
-        yspk = np.array([[7.745], [6.662]]- y_op)
+        yspk = np.array([[normalize(7.745,'m')], [normalize(6.662,'p')]]- y_op)
     elif j == 10:
-        yspk = np.array([[8.5], [7]]- y_op)
+        yspk = np.array([[normalize(8.5,'m')], [normalize(7,'p')]]- y_op)
     elif j == 40:
-        yspk = np.array([[7], [6]]- y_op)
+        yspk = np.array([[normalize(7,'m')], [normalize(6,'p')]]- y_op)
     elif j == 70:
-        yspk = np.array([[7.5], [6.5]]- y_op)
+        yspk = np.array([[normalize(7.5,'m')], [normalize(6.5,'p')]]- y_op)
 
     z_k = np.block([x_k.T, yspk.T])
     z_k_store_nn[k, :] = z_k
@@ -299,38 +325,38 @@ for k in range(K):
 t = np.arange(K) * Ts
 nT = len(t)
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:nT, 0] + x_op[0], label='Massa (kg)')
-plt.plot(t,z_k_store_mpc[:nT, 4] + x_op[0], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
-plt.plot(t,np.ones((nT,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
-plt.plot(t,np.ones((nT,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
+plt.plot(t,denormalize(z_k_store_mpc[:nT, 0] + x_op[0],'m'), label='Massa (kg)')
+plt.plot(t,denormalize(z_k_store_mpc[:nT, 4] + x_op[0],'m'), label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,denormalize(z_k_store_nn[:nT, 0] + x_op[0],'m'), label='Massa NN (kg)', linestyle='--')
+plt.plot(t,np.ones((nT,1)) * (denormalize(yMax[0] + x_op[0],'m')), label='Massa Max', linestyle=':', color='black')
+plt.plot(t,np.ones((nT,1)) * (denormalize(yMin[0] + x_op[0],'m')), label='Massa Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'zero_massa_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'norm_massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t,z_k_store_mpc[:nT, 1] + x_op[1], label='Pressão (MPa)')
-plt.plot(t,z_k_store_mpc[:nT, 5] + x_op[1], label='Setpoint', linestyle='-.', color = 'red')
-plt.plot(t,z_k_store_nn[:nT, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
-plt.plot(t,np.ones((nT,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
-plt.plot(t,np.ones((nT,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
+plt.plot(t,denormalize(z_k_store_mpc[:nT, 1] + x_op[1],'p'), label='Pressão (MPa)')
+plt.plot(t,denormalize(z_k_store_mpc[:nT, 5] + x_op[1],'p'), label='Setpoint', linestyle='-.', color = 'red')
+plt.plot(t,denormalize(z_k_store_nn[:nT, 1] + x_op[1],'p'), label='Pressão NN (MPa)', linestyle='--')
+plt.plot(t,np.ones((nT,1)) * denormalize(yMax[1] + x_op[1],'p'), label='Pressão Max', linestyle=':', color='black')
+plt.plot(t,np.ones((nT,1)) * denormalize(yMin[1] + x_op[1],'p'), label='Pressão Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'zero_pressao_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'norm_pressao_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t, z_k_store_mpc[:nT, 2] + u_op[0], label='Abertura da válvula (m)')
-plt.plot(t, z_k_store_nn[:nT, 2] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
-plt.plot(t, np.ones((nT,1)) * (uMax[0] + u_op[0]), label='Abertura Max', linestyle=':', color='black')
-plt.plot(t, np.ones((nT,1)) * (uMin[0] + u_op[0]), label='Abertura Min', linestyle=':', color='black')
+plt.plot(t, denormalize(z_k_store_mpc[:nT, 2] + u_op[0],'a'), label='Abertura da válvula (m)')
+plt.plot(t, denormalize(z_k_store_nn[:nT, 2] + u_op[0],'a'), label='Abertura da válvula NN (m)', linestyle='--')
+plt.plot(t, np.ones((nT,1)) * denormalize(uMax[0] + u_op[0],'a'), label='Abertura Max', linestyle=':', color='black')
+plt.plot(t, np.ones((nT,1)) * denormalize(uMin[0] + u_op[0],'a'), label='Abertura Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'zero_abertura_valvula_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'norm_abertura_valvula_mpc.png'))
 
 plt.figure(figsize=(10, 6))
-plt.plot(t, z_k_store_mpc[:nT, 3] + u_op[1], label='Rotação do motor (rpm)')
-plt.plot(t, z_k_store_nn[:nT, 3] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
-plt.plot(t, np.ones((nT,1)) * (uMax[1] + u_op[1]), label='Rotação Max', linestyle=':', color='black')
-plt.plot(t, np.ones((nT,1)) * (uMin[1] + u_op[1]), label='Rotação Min', linestyle=':', color='black')
+plt.plot(t, denormalize(z_k_store_mpc[:nT, 3] + u_op[1],'n'), label='Rotação do motor (rpm)')
+plt.plot(t, denormalize(z_k_store_nn[:nT, 3] + u_op[1],'n'), label='Rotação do motor NN (rpm)', linestyle='--')
+plt.plot(t, np.ones((nT,1)) * denormalize(uMax[1] + u_op[1],'n'), label='Rotação Max', linestyle=':', color='black')
+plt.plot(t, np.ones((nT,1)) * denormalize(uMin[1] + u_op[1],'n'), label='Rotação Min', linestyle=':', color='black')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'zero_rotacao_motor_mpc.png'))
+plt.savefig(os.path.join(output_dir, 'norm_rotacao_motor_mpc.png'))
 
 D_eigvals = np.linalg.eigvals(D)
 print(D_norm)

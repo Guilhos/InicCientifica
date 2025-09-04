@@ -6,7 +6,7 @@ import casadi as ca
 import control as ctrl
 from scipy.linalg import block_diag
 import os
-output_dir = "MPC_to_NN/MPCvsNN - Sistema Compressão/output_figures"
+output_dir = "MPC_to_NN/MPCvsNN - Sistema Compressão/output_figures/regulatorio"
 os.makedirs(output_dir, exist_ok=True)
 np.set_printoptions(precision=2)
 
@@ -181,7 +181,7 @@ for g in range(Nx*n):
         phi[g] = 0
 
 residual = y0 - D @ phi - zeta
-K_gain = 1.1 * np.eye(Nx*n*Nu*Nx)
+K_gain = 1.001 * np.eye(Nx*n*Nu*Nx)
 y = y0.copy()
 
 U_nn = np.zeros((K, Nu))
@@ -224,7 +224,7 @@ t = np.arange(K) * Ts
 nT = len(t)
 plt.figure(figsize=(10, 6))
 plt.plot(t,xk_store_mpc[:nT, 0] + x_op[0], label='Massa (kg)')
-#plt.plot(t,xk_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
+plt.plot(t,xk_store_nn[:nT, 0] + x_op[0], label='Massa NN (kg)', linestyle='--')
 plt.plot(t,np.ones((nT,1)) * (yMax[0] + x_op[0]), label='Massa Max', linestyle=':', color='black')
 plt.plot(t,np.ones((nT,1)) * (yMin[0] + x_op[0]), label='Massa Min', linestyle=':', color='black')
 plt.tight_layout()
@@ -232,7 +232,7 @@ plt.savefig(os.path.join(output_dir, 'reg_massa_mpc.png'))
 
 plt.figure(figsize=(10, 6))
 plt.plot(t,xk_store_mpc[:nT, 1] + x_op[1], label='Pressão (MPa)')
-#plt.plot(t,xk_store_nn[:nT, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
+plt.plot(t,xk_store_nn[:nT, 1] + x_op[1], label='Pressão NN (MPa)', linestyle='--')
 plt.plot(t,np.ones((nT,1)) * (yMax[1] + x_op[1]), label='Pressão Max', linestyle=':', color='black')
 plt.plot(t,np.ones((nT,1)) * (yMin[1] + x_op[1]), label='Pressão Min', linestyle=':', color='black')
 plt.tight_layout()
@@ -240,7 +240,7 @@ plt.savefig(os.path.join(output_dir, 'reg_pressao_mpc.png'))
 
 plt.figure(figsize=(10, 6))
 plt.plot(t, U_mpc[:nT, 0] + u_op[0], label='Abertura da válvula (m)')
-#plt.plot(t, U_nn[:nT, 0] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
+plt.plot(t, U_nn[:nT, 0] + u_op[0], label='Abertura da válvula NN (m)', linestyle='--')
 plt.plot(t, np.ones((nT,1)) * (uMax[0] + u_op[0]), label='Abertura Max', linestyle=':', color='black')
 plt.plot(t, np.ones((nT,1)) * (uMin[0] + u_op[0]), label='Abertura Min', linestyle=':', color='black')
 plt.tight_layout()
@@ -248,7 +248,7 @@ plt.savefig(os.path.join(output_dir, 'reg_abertura_valvula_mpc.png'))
 
 plt.figure(figsize=(10, 6))
 plt.plot(t, U_mpc[:nT, 1] + u_op[1], label='Rotação do motor (rpm)')
-#plt.plot(t, U_nn[:nT, 1] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
+plt.plot(t, U_nn[:nT, 1] + u_op[1], label='Rotação do motor NN (rpm)', linestyle='--')
 plt.plot(t, np.ones((nT,1)) * (uMax[1] + u_op[1]), label='Rotação Max', linestyle=':', color='black')
 plt.plot(t, np.ones((nT,1)) * (uMin[1] + u_op[1]), label='Rotação Min', linestyle=':', color='black')
 plt.tight_layout()
