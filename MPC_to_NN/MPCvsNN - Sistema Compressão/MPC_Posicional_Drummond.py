@@ -101,8 +101,9 @@ sys_d = ctrl.c2d(sys_c, Ts, method='zoh')
 
 # MPC problem setup
 n = 10
-nx = 2 * n
-nu = 2 * n
+p = m = n
+nx = 2
+nu = 2
 scaling = 1 * 1e0
 
 A, B, C, D = ctrl.ssdata(sys_d)
@@ -114,28 +115,35 @@ Qtilde = np.array([[10,10], [10,10]])
 
 R = Rtilde
 P = Ptilde
-for j in range(n-1):
+for j in range(m-1):
     R = block_diag(R, Rtilde)
+
+for j in range(p-1):
     P = block_diag(Qtilde, P)
 
-My = np.zeros((N * n, N * n))
-Gtilde = np.array([[normalize(0.65,'a'), normalize(5,'n')], [normalize(0.35,'a'), normalize(2.7,'n')]])
+My = np.zeros((p * nx, m * nu))
+Gtilde = np.array([[1, 1], [0, 0]])
 G = Gtilde
-for i in range(n):
+for i in range(p):
     for j in range(i+1):
-        if (j+1)*N <= N* n:
+        if (j+1)*nu <= m * nu:
             My[i*N:(i+1)*N, j*N:(j+1)*N] = np.linalg.matrix_power(A, i-j) @ B
-    if i < n-1:
+    if i < m-1:
         G = block_diag(G, Gtilde)
 
+psi = np.block([[A]])
+for i in range(p-1):
+    psi = np.vstack((psi, psi[-N:] @ A))
+
 H = R + My.T @ P @ My
-F_add_quadprog = 1 * np.hstack([(A.T @ Qtilde @ B).reshape(-1,1), np.zeros((N*N, N*n-1))]).T
+H = (H + H.T) / 2  # ensure H is symmetric
+F_add_quadprog = 1 * (psi.T @ P @ My).T
 F_add = F_add_quadprog * 1
 S = G @ np.linalg.inv(H) @ F_add
 
 w = np.ones((2 * n, 1)) * scaling
 
-D = np.eye(nx) - G @ np.linalg.inv(H) @ G.T
+D = np.eye(p*nx) - G @ np.linalg.inv(H) @ G.T
 
 b_qp = w
 A_qp = G
@@ -143,15 +151,16 @@ A_qp = G
 # Simulate the MPC policy
 K = 25
 
-x0 = -np.array([[1], [1]]) * 2e2
+x_op = np.array([[m_exp], [p_exp]])
+x0 = np.array([[normalize(7, 'm')], [normalize(6,'p')]]) - x_op
 xk = x0.copy()
-u_mpc = np.zeros(K)
-u_YALMIP = np.zeros((n, K))
+u_mpc = np.zeros((nu, K))
+u_YALMIP = np.zeros((n*nu, K))
 xk_store_MPC = np.zeros((N, K))
 
 for j in range(K):
-    u = cp.Variable((n, 1))
-    f_yalmip = xk.T @ (2 * np.hstack([(A.T @ Qtilde @ B).reshape(-1,1), np.zeros((N, n-1))]))
+    u = cp.Variable((nu*m, 1))
+    f_yalmip = xk.T @ (2 * (psi.T @ P @ My))
     cost = cp.quad_form(u, H) + 1e0 * f_yalmip @ u
     constraints = [A_qp @ u <= b_qp]
     prob = cp.Problem(cp.Minimize(cost), constraints)
@@ -159,25 +168,25 @@ for j in range(K):
     
     u_YALMIP[:, j:j+1] = u.value
     
-    u_mpc[j] = u_YALMIP[0, j]
-    xk = A @ xk + B * u_mpc[j]
+    u_mpc[:, j] = u_YALMIP[:nu, j]
+    xk = A @ xk + B @ u_mpc[:, j].reshape(-1,1)
     xk_store_MPC[:, j:j+1] = xk
 
 # Simulate the implicit neural network policy
 iters = 1000  # number of iterations of the NN unraveling
-y_store = np.zeros((nx, iters))
-phi_store = np.zeros((nx, iters))
-res_store = np.zeros((nx, iters))
+y_store = np.zeros((p*nx, iters))
+phi_store = np.zeros((p*nx, iters))
+res_store = np.zeros((p*nx, iters))
 res_norm = np.zeros(iters)
-sign_store = np.ones((nx, iters))
+sign_store = np.ones((p*nx, iters))
 
 xk = x0.copy()
 c_MPC = 1 * S @ xk + 1 * w  # initialize the implicit NN
 zeta = -1 * c_MPC
 
-y0 = np.zeros((nx, 1))
-phi = np.zeros((nx, 1))
-for g in range(nx):
+y0 = np.zeros((p * nx, 1))
+phi = np.zeros((p * nx, 1))
+for g in range(p * nx):
     if y0[g] >= 0:
         phi[g] = y0[g]
     else:
@@ -187,9 +196,9 @@ residual = y0 - D @ phi - zeta
 K_gain = 0
 y = y0.copy()
 
-u_nn = np.zeros(K)
-u_ramp = np.zeros((n, K))
-xk_store_nn = np.zeros((N, K))
+u_nn = np.zeros((nu, K))
+u_ramp = np.zeros((m*nu, K))
+xk_store_nn = np.zeros((nx, K))
 res_norm_store = np.zeros((K, iters))
 
 for k in range(K):
@@ -201,8 +210,8 @@ for k in range(K):
         res_store[:, j:j+1] = residual
         ykp1 = D @ phi + zeta + 1 * K_gain * residual
         
-        phi = np.zeros((nx, 1))
-        for g in range(nx):
+        phi = np.zeros((p*nx, 1))
+        for g in range(p*nx):
             if ykp1[g] > 0:
                 phi[g] = ykp1[g]
             else:
@@ -217,8 +226,8 @@ for k in range(K):
     y_ramp = ykp1.copy()
     u_ramp[:, k:k+1] = -np.linalg.inv(H) @ (F_add @ xk + G.T @ phi)  # get the output
     
-    u_nn[k] = u_ramp[0, k]  # the step-ahead control action
-    xk = A @ xk + B * u_nn[k]  # implement the state update
+    u_nn[:, k] = u_ramp[:nu, k]  # the step-ahead control action
+    xk = A @ xk + B @ u_nn[:,k].reshape(-1,1)  # implement the state update
     xk_store_nn[:, k:k+1] = xk
 
 combined = np.vstack([xk_store_nn, xk_store_MPC])  # compare the results
@@ -250,16 +259,28 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'x2_state.png'), dpi=300)
 plt.close()
 
-# Figure 3: Control input
+# Figure 3: Control input u1
 plt.figure(figsize=(8, 5))
 plt.plot(range(K), u_ramp[0, :], '-xk', color=[0.2, 0.2, 0.2], linewidth=2, markersize=8)
-plt.plot(range(K), u_mpc, '+k', color=[0.6, 0.6, 0.6], linewidth=2, markersize=8)
+plt.plot(range(K), u_mpc[0, :], '+k', color=[0.6, 0.6, 0.6], linewidth=2, markersize=8)
 plt.grid(True)
 plt.xlabel('Time instant $k$')
-plt.ylabel('Input $u[k]$')
+plt.ylabel('Input $u_1[k]$')
 plt.legend(['Implicit NN controller', 'MPC Controller'], loc='lower left')
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'control_input.png'), dpi=300)
+plt.savefig(os.path.join(output_dir, 'control_input_u1.png'), dpi=300)
+plt.close()
+
+# Figure 4: Control input u2
+plt.figure(figsize=(8, 5))
+plt.plot(range(K), u_ramp[1, :], '-xk', color=[0.2, 0.2, 0.2], linewidth=2, markersize=8)
+plt.plot(range(K), u_mpc[1, :], '+k', color=[0.6, 0.6, 0.6], linewidth=2, markersize=8)
+plt.grid(True)
+plt.xlabel('Time instant $k$')
+plt.ylabel('Input $u_2[k]$')
+plt.legend(['Implicit NN controller', 'MPC Controller'], loc='lower left')
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'control_input_u2.png'), dpi=300)
 plt.close()
 
 # Figure 4: Residual norms for first few time steps
